@@ -7,7 +7,6 @@ import type {
   LeadEvent,
   Message,
   Sale,
-  User,
 } from "@/db/schema";
 import type {
   LeadSource,
@@ -17,12 +16,13 @@ import type {
   SuggestionType,
 } from "@/lib/domain/enums";
 import { LEAD_STATUS_LABELS } from "@/lib/domain/labels";
-import type { SuggestionTone } from "@/lib/validations/analysis";
+import type { SuggestionVariants } from "@/lib/validations/analysis";
 
 /**
- * Demonstration data used while the database and WhatsApp are not connected.
- * Every date is relative to "now" so the queue always looks alive.
- * Names and phone numbers are fictitious.
+ * Demonstration leads written to the database by `npm run db:seed`.
+ * Every date is relative to the moment the seed runs, so the queue looks alive.
+ * Names and phone numbers are fictitious, and every row has a fixed id so the
+ * demonstration data can be removed without touching real leads.
  */
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -32,25 +32,12 @@ function uid(group: number, index: number): string {
   return `00000000-0000-4000-8000-${String(group * 100000 + index).padStart(12, "0")}`;
 }
 
-export const MOCK_USER: User = {
-  id: uid(1, 1),
-  name: "Ryan Morais",
-  email: "vendedor@petlead.local",
-  role: "ADMIN",
-  createdAt: new Date("2026-01-05T12:00:00Z"),
-  updatedAt: new Date("2026-01-05T12:00:00Z"),
-};
-
-export type SuggestionTones = Partial<Record<SuggestionTone, string>>;
-
 export type Dataset = {
   leads: Lead[];
   conversations: Conversation[];
   messages: Message[];
   summaries: ConversationSummary[];
   suggestions: AiSuggestion[];
-  /** Alternative wordings of the current suggestion, by lead id. */
-  suggestionTones: Record<string, SuggestionTones>;
   followups: Followup[];
   events: LeadEvent[];
   sales: Sale[];
@@ -80,7 +67,7 @@ type Seed = {
     content: string;
     reason: string;
     confidence: number;
-    tones?: SuggestionTones;
+    tones?: SuggestionVariants;
   };
   sale?: { plan: string; daysAgo: number; viaFollowup?: boolean };
 };
@@ -515,7 +502,10 @@ const SEEDS: Seed[] = [
   },
 ];
 
-export function buildMockDataset(now: Date): Dataset {
+/** Ids of every demonstration lead, used to remove them later. */
+export const DEMO_LEAD_IDS = SEEDS.map((_, index) => uid(2, index + 1));
+
+export function buildDemoDataset(now: Date, ownerUserId: string): Dataset {
   const at = (hoursAgo: number) => new Date(now.getTime() - hoursAgo * HOUR_MS);
   const inDays = (days: number) => new Date(now.getTime() + days * DAY_MS);
 
@@ -525,7 +515,6 @@ export function buildMockDataset(now: Date): Dataset {
     messages: [],
     summaries: [],
     suggestions: [],
-    suggestionTones: {},
     followups: [],
     events: [],
     sales: [],
@@ -583,7 +572,7 @@ export function buildMockDataset(now: Date): Dataset {
         lastMessage.direction === "INBOUND" ? "MESSAGE_RECEIVED" : "MESSAGE_SENT",
         lastMessage.timestamp,
         lastMessage.text,
-        lastMessage.direction === "OUTBOUND" ? MOCK_USER.id : null,
+        lastMessage.direction === "OUTBOUND" ? ownerUserId : null,
       );
     }
 
@@ -616,12 +605,12 @@ export function buildMockDataset(now: Date): Dataset {
         content: seed.suggestion.content,
         reason: seed.suggestion.reason,
         confidence: seed.suggestion.confidence,
+        variants: seed.suggestion.tones ?? null,
         approved: false,
         editedContent: null,
         sentAt: null,
         createdAt: lastMessage?.timestamp ?? createdAt,
       });
-      if (seed.suggestion.tones) data.suggestionTones[leadId] = seed.suggestion.tones;
     }
 
     let nextFollowupAt: Date | null = null;
@@ -669,12 +658,12 @@ export function buildMockDataset(now: Date): Dataset {
           createdAt: sentAt,
           updatedAt: sentAt,
         });
-        addEvent("FOLLOWUP_SENT", sentAt, "Follow-up enviado após aprovação.", MOCK_USER.id);
+        addEvent("FOLLOWUP_SENT", sentAt, "Follow-up enviado após aprovação.", ownerUserId);
       }
       data.sales.push({
         id: uid(9, n),
         leadId,
-        ownerUserId: MOCK_USER.id,
+        ownerUserId: ownerUserId,
         planName: seed.sale.plan,
         monthlyValue: null,
         source: seed.source,
@@ -683,12 +672,12 @@ export function buildMockDataset(now: Date): Dataset {
         closedAt,
         createdAt: closedAt,
       });
-      addEvent("SALE_CLOSED", closedAt, seed.sale.plan, MOCK_USER.id);
+      addEvent("SALE_CLOSED", closedAt, seed.sale.plan, ownerUserId);
     }
 
     data.leads.push({
       id: leadId,
-      ownerUserId: MOCK_USER.id,
+      ownerUserId: ownerUserId,
       name: seed.name,
       phone: seed.phone,
       email: null,

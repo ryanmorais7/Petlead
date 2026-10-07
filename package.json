@@ -10,7 +10,9 @@
     "typecheck": "next typegen && tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "db:seed": "tsx db/seed/index.ts",
+    "db:seed:clear": "tsx db/seed/index.ts --clear"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.2.0",
@@ -34,6 +36,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.4.0",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   }
 }
