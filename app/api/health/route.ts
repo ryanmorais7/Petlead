@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import { connection } from "next/server";
 
 import { getDb } from "@/db";
+import { readAuthSecret } from "@/lib/auth/token";
 import { logger } from "@/lib/logger";
 
 type HealthStatus =
@@ -9,14 +10,17 @@ type HealthStatus =
   | "missing_database_url"
   | "database_unreachable"
   | "missing_tables"
-  | "missing_user";
+  | "missing_user"
+  | "missing_auth_secret";
 
 const HINTS: Record<HealthStatus, string> = {
   ok: "Tudo certo.",
   missing_database_url: "A variável DATABASE_URL não está definida neste ambiente.",
   database_unreachable: "DATABASE_URL está definida, mas a conexão com o banco falhou.",
   missing_tables: "O banco conectou, mas as tabelas não existem. Rode as migrations.",
-  missing_user: "As tabelas existem, mas não há nenhum usuário. Rode o seed.",
+  missing_user: "As tabelas existem, mas não há nenhum usuário. Rode npm run user:set.",
+  missing_auth_secret:
+    "A variável AUTH_SECRET não está definida ou tem menos de 32 caracteres. O login fica indisponível.",
 };
 
 function respond(status: HealthStatus, extra: Record<string, unknown> = {}) {
@@ -48,11 +52,12 @@ export async function GET() {
     );
     if (!tables.rows[0]?.leads || !tables.rows[0]?.users) return respond("missing_tables");
 
-    const counts = await db.execute<{ users: number; leads: number }>(
-      sql`select (select count(*)::int from users) as users, (select count(*)::int from leads) as leads`,
+    const counts = await db.execute<{ users: number }>(
+      sql`select count(*)::int as users from users`,
     );
-    const { users, leads } = counts.rows[0];
-    return respond(users === 0 ? "missing_user" : "ok", { users, leads });
+    if (counts.rows[0].users === 0) return respond("missing_user");
+    if (!readAuthSecret()) return respond("missing_auth_secret");
+    return respond("ok");
   } catch (error) {
     logger.error("Health check failed", { error });
     return respond("database_unreachable");

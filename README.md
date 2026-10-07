@@ -15,8 +15,8 @@ As telas leem e gravam no banco de dados:
 - **Leads** (`/leads`): lista com busca e filtros, e cadastro manual em `/leads/novo`.
 - **Perfil do lead** (`/leads/[id]`): dados, resumo, mensagens, follow-ups, venda e histórico.
 
-Ainda não conectados: WhatsApp Business Platform, geração de mensagens e login.
-Enquanto não há login, o sistema assume um único vendedor (o primeiro usuário do banco).
+O acesso exige login com e-mail e senha. Ainda não conectados: WhatsApp Business
+Platform e geração de mensagens.
 
 ## Stack
 
@@ -28,13 +28,21 @@ Requer Node.js 20.9 ou superior.
 
 ```bash
 npm install
-cp .env.example .env.local   # preencha DATABASE_URL
+cp .env.example .env.local   # preencha DATABASE_URL e AUTH_SECRET
 npm run db:migrate           # cria as tabelas
-npm run db:seed              # cria o vendedor e os leads de demonstração
 npm run dev
 ```
 
-Abra http://localhost:3000.
+Crie o seu acesso (a senha é lida do ambiente e só o hash é gravado):
+
+```bash
+USER_EMAIL=voce@exemplo.com USER_PASSWORD='sua-senha' npm run user:set
+```
+
+No PowerShell: `$env:USER_EMAIL='voce@exemplo.com'; $env:USER_PASSWORD='sua-senha'; npm run user:set`.
+O mesmo comando troca a senha depois. Abra http://localhost:3000 e entre.
+
+Para ver o sistema com dados fictícios, rode `npm run db:seed`.
 
 Os leads de demonstração são fictícios e têm ids fixos. `npm run db:seed` os recria com
 datas atualizadas e `npm run db:seed:clear` os remove, sem tocar nos leads reais.
@@ -53,6 +61,7 @@ datas atualizadas e `npm run db:seed:clear` os remove, sem tocar nos leads reais
 | `npm run db:studio`   | Abre o Drizzle Studio                             |
 | `npm run db:seed`     | Cria o vendedor e recarrega os leads de demonstração |
 | `npm run db:seed:clear` | Remove os leads de demonstração                 |
+| `npm run user:set`    | Cria o vendedor ou troca e-mail e senha           |
 
 ## Variáveis de ambiente
 
@@ -108,6 +117,9 @@ lib/
 
 ## Regras que o código garante
 
+- **Acesso**: sem sessão válida, toda rota redireciona para `/login`. A senha é guardada
+  como hash scrypt, a sessão é um cookie assinado e inacessível a scripts, e cinco senhas
+  erradas bloqueiam a conta por 15 minutos.
 - **Aprovação obrigatória**: sugestões nascem com `approved = false` e o schema de envio
   exige `approved: true` vindo da tela do vendedor.
 - **Não insistir**: um lead com `DO_NOT_CONTACT` nunca entra na fila, não recebe sugestão
