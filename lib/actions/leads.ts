@@ -2,7 +2,7 @@
 
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { refresh } from "next/cache";
-import { redirect } from "next/navigation";
+import { redirect, unstable_rethrow } from "next/navigation";
 
 import { getDb } from "@/db";
 import { followups, leadEvents, leads, sales, type Lead } from "@/db/schema";
@@ -36,6 +36,8 @@ async function run(name: string, mutation: () => Promise<void>): Promise<ActionR
   try {
     await mutation();
   } catch (error) {
+    // An expired session redirects to the sign-in screen instead of failing here.
+    unstable_rethrow(error);
     logger.error(`Action failed: ${name}`, { error });
     return { ok: false, message: toUserMessage(error) };
   }
@@ -231,6 +233,7 @@ export async function createLead(_previous: LeadFormState, formData: FormData): 
       description: "Cadastrado manualmente.",
     });
   } catch (error) {
+    unstable_rethrow(error);
     logger.error("Action failed: createLead", { error });
     return { message: toUserMessage(error), values };
   }
