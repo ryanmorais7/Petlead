@@ -1,7 +1,17 @@
-import { CheckCheck, FileText, ImageIcon, Mic, Paperclip, type LucideIcon } from "lucide-react";
+import {
+  Check,
+  CheckCheck,
+  CircleAlert,
+  Clock,
+  FileText,
+  ImageIcon,
+  Mic,
+  Paperclip,
+  type LucideIcon,
+} from "lucide-react";
 
 import type { Message } from "@/db/schema";
-import type { MessageType } from "@/lib/domain/enums";
+import type { MessageStatus, MessageType } from "@/lib/domain/enums";
 import { dayKey, formatThreadDay, formatTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -18,6 +28,24 @@ const ATTACHMENT_LABELS: Record<Exclude<MessageType, "TEXT">, string> = {
   DOCUMENT: "Documento",
   OTHER: "Anexo",
 };
+
+/** WhatsApp-like delivery marks for messages we sent. */
+function DeliveryIcon({ status }: { status: MessageStatus }) {
+  switch (status) {
+    case "PENDING":
+      return <Clock className="size-3.5" aria-label="Enviando" />;
+    case "SENT":
+      return <Check className="size-3.5" aria-label="Enviada" />;
+    case "DELIVERED":
+      return <CheckCheck className="size-3.5" aria-label="Entregue" />;
+    case "READ":
+      return <CheckCheck className="size-3.5 text-sky-300" aria-label="Lida" />;
+    case "FAILED":
+      return <CircleAlert className="size-3.5 text-accent-300" aria-label="Falhou" />;
+    default:
+      return null;
+  }
+}
 
 function MessageBubble({ message }: { message: Message }) {
   const outbound = message.direction === "OUTBOUND";
@@ -52,10 +80,9 @@ function MessageBubble({ message }: { message: Message }) {
             outbound ? "text-brand-100" : "text-zinc-400",
           )}
         >
+          {message.status === "FAILED" ? "Não enviada · " : null}
           {formatTime(message.timestamp)}
-          {outbound && message.status === "READ" ? (
-            <CheckCheck className="size-3.5" aria-label="Lida" />
-          ) : null}
+          {outbound ? <DeliveryIcon status={message.status} /> : null}
         </span>
       </div>
     </li>

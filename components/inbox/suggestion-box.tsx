@@ -1,9 +1,10 @@
 "use client";
 
 import { Check, Copy, MessageCircle, RefreshCw, RotateCcw, Send } from "lucide-react";
-import { useState } from "react";
+import { useState, useTransition } from "react";
 
 import { Button, buttonStyles } from "@/components/ui/button";
+import { sendMessage } from "@/lib/actions/messages";
 import { whatsappLink } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import {
@@ -13,24 +14,45 @@ import {
 } from "@/lib/validations/analysis";
 
 type SuggestionBoxProps = {
+  leadId: string;
+  suggestionId: string;
   phone: string;
   /** Text proposed for this conversation. */
   content: string;
   /** Alternative wordings prepared in advance. */
   tones: Partial<Record<SuggestionTone, string>>;
+  /** Why direct sending is unavailable right now. Null when the seller can send. */
+  blockedReason: string | null;
 };
 
 /**
  * Review step of every outgoing message: the seller reads, adjusts the text
  * and decides to send. Nothing here sends anything on its own.
  */
-export function SuggestionBox({ phone, content, tones }: SuggestionBoxProps) {
+export function SuggestionBox({
+  leadId,
+  suggestionId,
+  phone,
+  content,
+  tones,
+  blockedReason,
+}: SuggestionBoxProps) {
   const [text, setText] = useState(content);
   const [activeTone, setActiveTone] = useState<SuggestionTone | null>(null);
   const [copied, setCopied] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [sending, startSending] = useTransition();
 
   const trimmed = text.trim();
   const edited = text !== (activeTone ? tones[activeTone] : content);
+
+  function approveAndSend() {
+    setError(null);
+    startSending(async () => {
+      const result = await sendMessage({ leadId, text: trimmed, suggestionId });
+      if (!result.ok) setError(result.message);
+    });
+  }
 
   function applyTone(tone: SuggestionTone) {
     const variant = tones[tone];
@@ -112,13 +134,18 @@ export function SuggestionBox({ phone, content, tones }: SuggestionBoxProps) {
       <div className="mt-4 space-y-2 border-t border-zinc-100 pt-4">
         <Button
           variant="primary"
-          disabled
-          title="Disponível ao conectar o WhatsApp"
+          disabled={blockedReason !== null || sending || !trimmed}
+          onClick={approveAndSend}
           className="w-full"
         >
           <Send aria-hidden />
-          Aprovar e enviar
+          {sending ? "Enviando..." : "Aprovar e enviar"}
         </Button>
+        {error ? (
+          <p role="alert" className="text-xs text-red-700">
+            {error}
+          </p>
+        ) : null}
         <div className="grid grid-cols-2 gap-2">
           <a
             href={trimmed ? whatsappLink(phone, trimmed) : undefined}
@@ -135,10 +162,12 @@ export function SuggestionBox({ phone, content, tones }: SuggestionBoxProps) {
             {copied ? "Copiada" : "Copiar"}
           </Button>
         </div>
-        <p className="text-[11px] leading-relaxed text-zinc-500">
-          Enquanto o envio direto não está conectado, abra a conversa no WhatsApp com o texto já
-          preenchido e envie por lá.
-        </p>
+        {blockedReason ? (
+          <p className="text-[11px] leading-relaxed text-zinc-500">
+            {blockedReason} Você ainda pode abrir a conversa no WhatsApp com o texto já preenchido
+            e enviar por lá.
+          </p>
+        ) : null}
       </div>
     </div>
   );

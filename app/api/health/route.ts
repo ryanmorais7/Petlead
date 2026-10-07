@@ -4,6 +4,7 @@ import { connection } from "next/server";
 import { getDb } from "@/db";
 import { readAuthSecret } from "@/lib/auth/token";
 import { logger } from "@/lib/logger";
+import { getWhatsAppWebhookConfig, isWhatsAppConfigured } from "@/lib/whatsapp/config";
 
 type HealthStatus =
   | "ok"
@@ -57,7 +58,16 @@ export async function GET() {
     );
     if (counts.rows[0].users === 0) return respond("missing_user");
     if (!readAuthSecret()) return respond("missing_auth_secret");
-    return respond("ok");
+
+    // WhatsApp is optional: the app works without it, with sending disabled.
+    const webhook = getWhatsAppWebhookConfig();
+    return respond("ok", {
+      whatsapp: {
+        sending: isWhatsAppConfigured(),
+        webhookVerification: webhook.verifyToken !== null,
+        webhookSignature: webhook.appSecret !== null,
+      },
+    });
   } catch (error) {
     logger.error("Health check failed", { error });
     return respond("database_unreachable");

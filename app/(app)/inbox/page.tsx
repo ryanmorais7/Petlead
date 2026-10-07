@@ -1,4 +1,4 @@
-import { ArrowLeft, ChevronRight, MessagesSquare, PanelRight, Sparkles } from "lucide-react";
+import { ArrowLeft, ChevronRight, Clock, MessagesSquare, PanelRight, Sparkles } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -6,16 +6,20 @@ import { Suspense } from "react";
 import { MessageThread } from "@/components/conversation/message-thread";
 import { ConversationList } from "@/components/inbox/conversation-list";
 import { IntelligencePanel } from "@/components/inbox/intelligence-panel";
+import { MessageComposer } from "@/components/inbox/message-composer";
 import { StatusBadge } from "@/components/leads/lead-badges";
 import { Avatar } from "@/components/ui/avatar";
 import { buttonStyles } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getInbox } from "@/lib/data/inbox";
-import { formatPets } from "@/lib/format";
+import { calendarDaysBetween, formatPets, formatTime } from "@/lib/format";
 import { isContactBlocked } from "@/lib/leads/contact-policy";
 import { cn } from "@/lib/utils";
 import { leadIdSchema } from "@/lib/validations/lead";
+import { isWhatsAppConfigured } from "@/lib/whatsapp/config";
+import { getConversationWindow, WINDOW_LABELS } from "@/lib/whatsapp/conversation-window";
+import { getSendBlock } from "@/lib/whatsapp/send-policy";
 
 export const metadata: Metadata = { title: "Conversas" };
 
@@ -57,6 +61,17 @@ async function Inbox({ searchParams }: { searchParams: PageProps<"/inbox">["sear
     requestedId.success ? requestedId.data : undefined,
   );
   const threadHref = selected ? `/inbox?c=${selected.lead.id}` : "/inbox";
+
+  // Shown to the seller here and enforced again by the server on every send.
+  const lastInbound = selected?.messages.findLast((message) => message.direction === "INBOUND");
+  const conversationWindow = getConversationWindow(lastInbound?.timestamp ?? null, now);
+  const sendBlock = selected
+    ? getSendBlock({
+        lead: selected.lead,
+        window: conversationWindow.state,
+        configured: isWhatsAppConfigured(),
+      })
+    : null;
 
   return (
     <div className={FRAME}>
@@ -114,9 +129,31 @@ async function Inbox({ searchParams }: { searchParams: PageProps<"/inbox">["sear
               </Link>
             </header>
 
+            <p
+              className={cn(
+                "flex shrink-0 items-center gap-1.5 border-b px-4 py-1.5 text-xs font-medium",
+                conversationWindow.state === "OPEN"
+                  ? "border-brand-100 bg-brand-50 text-brand-800"
+                  : "border-zinc-200 bg-zinc-100 text-zinc-600",
+              )}
+            >
+              <Clock className="size-3.5" aria-hidden />
+              {WINDOW_LABELS[conversationWindow.state]}
+              {conversationWindow.state === "OPEN" && conversationWindow.expiresAt ? (
+                <span className="font-normal">
+                  · até {formatTime(conversationWindow.expiresAt)}
+                  {calendarDaysBetween(now, conversationWindow.expiresAt) === 1 ? " de amanhã" : ""}
+                </span>
+              ) : null}
+            </p>
+
             {/* Reversed column keeps the scroll anchored at the most recent message. */}
             <div className="flex min-h-0 flex-1 flex-col-reverse overflow-y-auto bg-zinc-50 px-3 py-4 sm:px-6">
-              <MessageThread messages={selected.messages} now={now} />
+              {selected.messages.length > 0 ? (
+                <MessageThread messages={selected.messages} now={now} />
+              ) : (
+                <p className="m-auto text-sm text-zinc-500">Nenhuma mensagem nesta conversa ainda.</p>
+              )}
             </div>
 
             {selected.suggestion && !isContactBlocked(selected.lead) ? (
@@ -137,6 +174,13 @@ async function Inbox({ searchParams }: { searchParams: PageProps<"/inbox">["sear
                 </span>
               </Link>
             ) : null}
+
+            {/* The key clears the draft when another conversation is opened. */}
+            <MessageComposer
+              key={selected.lead.id}
+              leadId={selected.lead.id}
+              blockedReason={sendBlock?.message ?? null}
+            />
           </section>
 
           <aside
@@ -158,7 +202,7 @@ async function Inbox({ searchParams }: { searchParams: PageProps<"/inbox">["sear
               <span className="truncate text-xs text-zinc-500 xl:hidden">{selected.lead.name}</span>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto">
-              <IntelligencePanel thread={selected} />
+              <IntelligencePanel thread={selected} sendBlockedReason={sendBlock?.message ?? null} />
             </div>
           </aside>
         </>

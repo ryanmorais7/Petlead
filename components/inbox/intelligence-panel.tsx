@@ -21,7 +21,13 @@ function Block({ title, children }: { title: string; children: ReactNode }) {
 }
 
 /** Right column of the inbox: what we know about the customer and what to do next. */
-export function IntelligencePanel({ thread }: { thread: InboxThread }) {
+type IntelligencePanelProps = {
+  thread: InboxThread;
+  /** Why direct sending is unavailable right now. Null when the seller can send. */
+  sendBlockedReason: string | null;
+};
+
+export function IntelligencePanel({ thread, sendBlockedReason }: IntelligencePanelProps) {
   const { lead, summary, suggestion } = thread;
   const blocked = isContactBlocked(lead);
 
@@ -74,9 +80,12 @@ export function IntelligencePanel({ thread }: { thread: InboxThread }) {
             {/* The key resets the draft when another conversation is opened. */}
             <SuggestionBox
               key={suggestion.id}
+              leadId={lead.id}
+              suggestionId={suggestion.id}
               phone={lead.phone}
               content={suggestion.content}
               tones={suggestion.variants ?? {}}
+              blockedReason={sendBlockedReason}
             />
           </>
         ) : (
