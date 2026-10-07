@@ -33,6 +33,9 @@ export type ConversationAnalysis = z.infer<typeof conversationAnalysisSchema>;
 export const SUGGESTION_TONES = ["friendly", "short", "direct", "softClose"] as const;
 export type SuggestionTone = (typeof SUGGESTION_TONES)[number];
 
+/** Alternative wordings of one suggestion, stored next to it. */
+export type SuggestionVariants = Partial<Record<SuggestionTone, string>>;
+
 export const SUGGESTION_TONE_LABELS: Record<SuggestionTone, string> = {
   friendly: "Mais carinhosa",
   short: "Mais curta",

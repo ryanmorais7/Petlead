@@ -28,6 +28,7 @@ import {
   USER_ROLES,
   WEBHOOK_EVENT_STATUSES,
 } from "@/lib/domain/enums";
+import type { SuggestionVariants } from "@/lib/validations/analysis";
 
 // Column names are derived from the property names (snake_case) by the
 // `casing` option set in drizzle.config.ts and db/index.ts.
@@ -190,6 +191,8 @@ export const aiSuggestions = pgTable(
     reason: text(),
     /** Model confidence between 0 and 1. */
     confidence: real(),
+    /** Alternative wordings (warmer, shorter, more direct, soft close). */
+    variants: jsonb().$type<SuggestionVariants>(),
     /** Nothing is sent to a customer unless the seller approves it. */
     approved: boolean().notNull().default(false),
     editedContent: text(),
