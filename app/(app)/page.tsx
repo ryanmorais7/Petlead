@@ -11,6 +11,7 @@ import {
 import type { Metadata } from "next";
 import { Suspense } from "react";
 
+import { LogoutButton } from "@/components/auth/logout-button";
 import { QueueSection } from "@/components/dashboard/queue-section";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { PageContainer, PageHeader } from "@/components/layout/page";
@@ -46,6 +47,8 @@ async function Dashboard() {
             ? `${formatWeekday(now)}. Ninguém precisa de você agora.`
             : `${formatWeekday(now)}. ${queueSize} ${queueSize === 1 ? "pessoa precisa" : "pessoas precisam"} da sua atenção hoje.`
         }
+        // The sidebar holds this button on large screens.
+        action={<LogoutButton className="lg:hidden" />}
       />
 
       <section aria-label="Indicadores" className="grid grid-cols-2 gap-3 md:grid-cols-4">

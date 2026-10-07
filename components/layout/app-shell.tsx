@@ -2,6 +2,8 @@ import { PawPrint } from "lucide-react";
 import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
 
+import { LogoutButton } from "@/components/auth/logout-button";
+
 import {
   ActiveSidebarLinks,
   ActiveTabBarLinks,
@@ -36,9 +38,12 @@ export function AppShell({ children }: { children: ReactNode }) {
             <ActiveSidebarLinks />
           </Suspense>
         </nav>
-        <p className="border-t border-zinc-100 px-4 py-3 text-xs leading-relaxed text-zinc-500">
-          Nenhuma mensagem é enviada sem a sua aprovação.
-        </p>
+        <div className="border-t border-zinc-100 px-4 py-3">
+          <p className="text-xs leading-relaxed text-zinc-500">
+            Nenhuma mensagem é enviada sem a sua aprovação.
+          </p>
+          <LogoutButton className="mt-2 -ml-2" />
+        </div>
       </aside>
 
       <main className="pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0 lg:pl-60">{children}</main>
