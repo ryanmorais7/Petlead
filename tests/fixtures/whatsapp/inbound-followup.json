@@ -1,0 +1,39 @@
+{
+  "object": "whatsapp_business_account",
+  "entry": [
+    {
+      "id": "200000000000001",
+      "changes": [
+        {
+          "field": "messages",
+          "value": {
+            "messaging_product": "whatsapp",
+            "metadata": {
+              "display_phone_number": "5511900000100",
+              "phone_number_id": "100000000000001"
+            },
+            "contacts": [
+              {
+                "profile": { "name": "Cliente Teste" },
+                "wa_id": "5511900000201"
+              }
+            ],
+            "messages": [
+              {
+                "from": "5511900000201",
+                "id": "wamid.FIXTURE_INBOUND_2",
+                "timestamp": "1790000600",
+                "type": "image",
+                "image": {
+                  "id": "300000000000001",
+                  "mime_type": "image/jpeg",
+                  "caption": "Esse é o Thor"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
