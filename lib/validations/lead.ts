@@ -4,14 +4,20 @@ import { LEAD_SOURCES, LEAD_STATUSES, LEAD_TEMPERATURES } from "@/lib/domain/enu
 
 export const leadIdSchema = z.uuid("Identificador de lead inválido.");
 
-/** Keeps digits only and requires a number with country and area code. */
+/**
+ * Keeps digits only and stores the number with country code. A number typed
+ * with just the area code, like (11) 98888-7777, is assumed to be Brazilian.
+ */
 export const phoneSchema = z
   .string()
-  .transform((value) => value.replace(/\D/g, ""))
+  .transform((value) => {
+    const digits = value.replace(/\D/g, "");
+    return digits.length === 10 || digits.length === 11 ? `55${digits}` : digits;
+  })
   .pipe(
     z
       .string()
-      .min(12, "Informe o telefone com DDI e DDD.")
+      .min(12, "Informe o telefone com DDD.")
       .max(15, "Telefone muito longo."),
   );
 

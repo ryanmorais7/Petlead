@@ -1,10 +1,12 @@
-import { SearchX } from "lucide-react";
+import { Plus, SearchX } from "lucide-react";
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Suspense } from "react";
 
 import { PageContainer, PageHeader } from "@/components/layout/page";
 import { LeadFiltersForm } from "@/components/leads/lead-filters";
 import { LeadList } from "@/components/leads/lead-list";
+import { buttonStyles } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageSkeleton } from "@/components/ui/skeleton";
@@ -18,7 +20,16 @@ type SearchParams = PageProps<"/leads">["searchParams"];
 export default function LeadsPage({ searchParams }: PageProps<"/leads">) {
   return (
     <PageContainer>
-      <PageHeader title="Leads" description="Todos os seus contatos, do primeiro oi ao fechamento." />
+      <PageHeader
+        title="Leads"
+        description="Todos os seus contatos, do primeiro oi ao fechamento."
+        action={
+          <Link href="/leads/novo" className={buttonStyles({ variant: "primary" })}>
+            <Plus aria-hidden />
+            Novo lead
+          </Link>
+        }
+      />
       <Suspense fallback={<PageSkeleton rows={6} />}>
         <Leads searchParams={searchParams} />
       </Suspense>
@@ -47,8 +58,12 @@ async function Leads({ searchParams }: { searchParams: SearchParams }) {
         <Card>
           <EmptyState
             icon={SearchX}
-            title="Nenhum lead encontrado"
-            description="Ajuste a busca ou limpe os filtros para ver todos os contatos."
+            title={total === 0 ? "Nenhum lead cadastrado" : "Nenhum lead encontrado"}
+            description={
+              total === 0
+                ? "Cadastre o primeiro contato em “Novo lead”."
+                : "Ajuste a busca ou limpe os filtros para ver todos os contatos."
+            }
           />
         </Card>
       ) : (
