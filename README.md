@@ -1,36 +1,105 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PetLead
 
-## Getting Started
+CRM de vendas para atendimento via WhatsApp. Organiza as conversas, resume cada
+cliente e responde a uma pergunta ao abrir o sistema: **quem eu deveria chamar hoje?**
 
-First, run the development server:
+Nenhuma mensagem é enviada a um cliente sem a aprovação do vendedor.
+
+## Estado atual
+
+Base do sistema, com as telas funcionando sobre dados de demonstração:
+
+- **Hoje** (`/`): indicadores e a fila do dia por prioridade.
+- **Conversas** (`/inbox`): lista, histórico e painel com resumo e mensagem sugerida.
+- **Leads** (`/leads`): lista com busca e filtros.
+- **Perfil do lead** (`/leads/[id]`): dados, resumo, mensagens, follow-ups, venda e histórico.
+
+Ainda não conectados: banco de dados, WhatsApp Business Platform e geração de mensagens.
+
+## Stack
+
+Next.js (App Router) · TypeScript · Tailwind CSS · Drizzle ORM · Neon PostgreSQL · Zod
+
+## Como executar
+
+Requer Node.js 20.9 ou superior.
 
 ```bash
+npm install
+cp .env.example .env.local
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Abra http://localhost:3000. Nesta etapa o sistema roda sem nenhuma variável preenchida.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Comando               | O que faz                                         |
+| --------------------- | ------------------------------------------------- |
+| `npm run dev`         | Servidor de desenvolvimento                       |
+| `npm run build`       | Build de produção                                 |
+| `npm run start`       | Executa o build de produção                       |
+| `npm run lint`        | ESLint                                            |
+| `npm run typecheck`   | Gera os tipos de rotas e roda o TypeScript        |
+| `npm run db:generate` | Gera uma migration a partir de `db/schema.ts`     |
+| `npm run db:migrate`  | Aplica as migrations no banco de `DATABASE_URL`   |
+| `npm run db:studio`   | Abre o Drizzle Studio                             |
 
-## Learn More
+## Variáveis de ambiente
 
-To learn more about Next.js, take a look at the following resources:
+Documentadas em [.env.example](.env.example). Os valores reais ficam em `.env.local`,
+que nunca é commitado. Todas são lidas apenas no servidor, por [lib/env.ts](lib/env.ts).
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Variável                                   | Usada para                           | Necessária a partir de |
+| ------------------------------------------ | ------------------------------------ | ---------------------- |
+| `DATABASE_URL`                             | Conexão com o Neon                   | Conexão do banco       |
+| `WHATSAPP_ACCESS_TOKEN`                    | Envio de mensagens pela Cloud API    | Integração WhatsApp    |
+| `WHATSAPP_PHONE_NUMBER_ID`                 | Número que envia as mensagens        | Integração WhatsApp    |
+| `WHATSAPP_BUSINESS_ACCOUNT_ID`             | Conta WhatsApp Business              | Integração WhatsApp    |
+| `WHATSAPP_APP_SECRET`                      | Validar a assinatura dos webhooks    | Integração WhatsApp    |
+| `WHATSAPP_WEBHOOK_VERIFY_TOKEN`            | Verificação do webhook pela Meta     | Integração WhatsApp    |
+| `WHATSAPP_GRAPH_API_VERSION`               | Versão da Graph API                  | Integração WhatsApp    |
+| `AI_PROVIDER`, `AI_API_KEY`, `AI_MODEL`    | Geração de resumos e mensagens       | Geração de mensagens   |
+| `AUTH_SECRET`                              | Assinatura da sessão                 | Autenticação           |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Banco de dados
 
-## Deploy on Vercel
+O schema está em [db/schema.ts](db/schema.ts) e a migration inicial em `db/migrations`.
+Para criar as tabelas em um banco Neon:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. Crie o projeto no Neon e copie a connection string *pooled*.
+2. Preencha `DATABASE_URL` em `.env.local`.
+3. Rode `npm run db:migrate`.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Estrutura
+
+```
+app/
+  (app)/              Telas autenticadas (dashboard, inbox, leads)
+components/
+  ui/                 Componentes base (botão, badge, card...)
+  layout/             Navegação e moldura das páginas
+  dashboard/ inbox/ leads/ conversation/
+db/
+  schema.ts           Tabelas, enums e relações
+  migrations/         SQL gerado pelo Drizzle
+lib/
+  domain/             Enums e rótulos, fonte única para banco, validação e UI
+  data/               Acesso a dados usado pelas telas
+  leads/              Política de contato, prioridade da fila e score
+  followups/          Configuração da cadência de follow-up
+  validations/        Schemas Zod (formulários, API, webhook, análise)
+  ai/                 Contrato do provider de sugestões
+  auth/               Usuário atual
+  mock/               Dados de demonstração
+```
+
+## Regras que o código garante
+
+- **Aprovação obrigatória**: sugestões nascem com `approved = false` e o schema de envio
+  exige `approved: true` vindo da tela do vendedor.
+- **Não insistir**: um lead com `DO_NOT_CONTACT` nunca entra na fila, não recebe sugestão
+  nem follow-up. A regra está em [lib/leads/contact-policy.ts](lib/leads/contact-policy.ts).
+- **Score é recomendação**: ordena a fila, mas nunca dispara envio.
+- **Idempotência**: `messages.whatsapp_message_id` é único, para que um webhook
+  reenviado não duplique mensagens.
