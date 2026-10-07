@@ -17,6 +17,7 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Everything except build assets, the icon and the setup diagnostics.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/health).*)"],
+  // Everything except build assets, the icon, the setup diagnostics and the
+  // WhatsApp webhook, which authenticates each request by its signature.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/health|api/whatsapp/webhook).*)"],
 };
