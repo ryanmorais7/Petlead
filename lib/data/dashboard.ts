@@ -1,10 +1,12 @@
 import "server-only";
 
-import { calendarDaysBetween } from "@/lib/format";
+import { count, eq } from "drizzle-orm";
+
+import { sales } from "@/db/schema";
 import { isActiveLead } from "@/lib/leads/contact-policy";
 import { QUEUE_BUCKETS, type QueueBucket } from "@/lib/leads/priority";
 
-import { buildOverviews, loadContext, type LeadOverview } from "./source";
+import { isDueToday, loadContext, loadOverviews, type LeadOverview } from "./source";
 
 export type DashboardStats = {
   totalLeads: number;
@@ -28,7 +30,13 @@ export type Dashboard = {
 
 export async function getDashboard(): Promise<Dashboard> {
   const context = await loadContext();
-  const overviews = buildOverviews(context);
+  const [overviews, [salesCount]] = await Promise.all([
+    loadOverviews(context),
+    context.db
+      .select({ value: count() })
+      .from(sales)
+      .where(eq(sales.ownerUserId, context.user.id)),
+  ]);
 
   const queueItems = overviews
     .filter((item): item is QueueItem => item.priority !== null)
@@ -42,7 +50,7 @@ export async function getDashboard(): Promise<Dashboard> {
   ) as Record<QueueBucket, QueueItem[]>;
 
   const totalLeads = overviews.length;
-  const closedSales = context.data.sales.length;
+  const closedSales = salesCount?.value ?? 0;
 
   return {
     now: context.now,
@@ -55,8 +63,7 @@ export async function getDashboard(): Promise<Dashboard> {
       ).length,
       needAttentionToday: queueItems.length,
       followupsToday: overviews.filter(
-        ({ nextFollowup }) =>
-          nextFollowup !== null && calendarDaysBetween(nextFollowup.scheduledFor, context.now) >= 0,
+        ({ nextFollowup }) => nextFollowup !== null && isDueToday(nextFollowup, context.now),
       ).length,
       unansweredConversations: overviews.filter((item) => item.awaitingReply).length,
       closedSales,

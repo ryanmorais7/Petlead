@@ -1,9 +1,23 @@
 import "server-only";
 
-import type { AiSuggestion, Followup, LeadEvent, Message, Sale } from "@/db/schema";
+import { and, asc, count, desc, eq, type SQL } from "drizzle-orm";
+
+import {
+  aiSuggestions,
+  followups,
+  leadEvents,
+  leads,
+  messages,
+  sales,
+  type AiSuggestion,
+  type Followup,
+  type LeadEvent,
+  type Message,
+  type Sale,
+} from "@/db/schema";
 import type { LeadFilters } from "@/lib/validations/lead";
 
-import { buildOverview, buildOverviews, loadContext, type LeadOverview } from "./source";
+import { loadContext, loadOverviews, type LeadOverview } from "./source";
 
 export type LeadList = { now: Date; total: number; items: LeadOverview[] };
 
@@ -16,15 +30,26 @@ function normalize(text: string): string {
 
 export async function listLeads(filters: LeadFilters = {}): Promise<LeadList> {
   const context = await loadContext();
-  const overviews = buildOverviews(context);
+
+  const conditions: SQL[] = [];
+  if (filters.status) conditions.push(eq(leads.status, filters.status));
+  if (filters.temperature) conditions.push(eq(leads.temperature, filters.temperature));
+  if (filters.source) conditions.push(eq(leads.source, filters.source));
+
+  const [overviews, [totalRow]] = await Promise.all([
+    loadOverviews(context, conditions.length > 0 ? and(...conditions) : undefined),
+    context.db
+      .select({ value: count() })
+      .from(leads)
+      .where(eq(leads.ownerUserId, context.user.id)),
+  ]);
+
+  // Accent-insensitive search over name, pets and phone.
   const query = filters.q ? normalize(filters.q) : null;
   const queryDigits = filters.q?.replace(/\D/g, "") ?? "";
 
   const items = overviews
     .filter(({ lead }) => {
-      if (filters.status && lead.status !== filters.status) return false;
-      if (filters.temperature && lead.temperature !== filters.temperature) return false;
-      if (filters.source && lead.source !== filters.source) return false;
       if (!query) return true;
       return (
         normalize(lead.name).includes(query) ||
@@ -34,10 +59,11 @@ export async function listLeads(filters: LeadFilters = {}): Promise<LeadList> {
     })
     .sort(
       (a, b) =>
-        (b.lead.lastContactAt?.getTime() ?? 0) - (a.lead.lastContactAt?.getTime() ?? 0),
+        (b.lead.lastContactAt ?? b.lead.createdAt).getTime() -
+        (a.lead.lastContactAt ?? a.lead.createdAt).getTime(),
     );
 
-  return { now: context.now, total: overviews.length, items };
+  return { now: context.now, total: totalRow?.value ?? 0, items };
 }
 
 export type LeadProfile = LeadOverview & {
@@ -52,27 +78,38 @@ export type LeadProfile = LeadOverview & {
 /** Returns null when the lead does not exist or belongs to another seller. */
 export async function getLeadProfile(leadId: string): Promise<LeadProfile | null> {
   const context = await loadContext();
-  const lead = context.data.leads.find((item) => item.id === leadId);
-  if (!lead) return null;
+  const { db } = context;
 
-  const ofLead = <T extends { leadId: string }>(rows: T[]) =>
-    rows.filter((row) => row.leadId === lead.id);
+  const [overview] = await loadOverviews(context, eq(leads.id, leadId));
+  if (!overview) return null;
+
+  const [messageRows, followupRows, suggestionRows, eventRows, saleRows] = await Promise.all([
+    db.select().from(messages).where(eq(messages.leadId, leadId)).orderBy(asc(messages.timestamp)),
+    db
+      .select()
+      .from(followups)
+      .where(eq(followups.leadId, leadId))
+      .orderBy(desc(followups.scheduledFor)),
+    db
+      .select()
+      .from(aiSuggestions)
+      .where(eq(aiSuggestions.leadId, leadId))
+      .orderBy(desc(aiSuggestions.createdAt)),
+    db
+      .select()
+      .from(leadEvents)
+      .where(eq(leadEvents.leadId, leadId))
+      .orderBy(desc(leadEvents.createdAt)),
+    db.select().from(sales).where(eq(sales.leadId, leadId)).orderBy(desc(sales.closedAt)).limit(1),
+  ]);
 
   return {
-    ...buildOverview(lead, context),
+    ...overview,
     now: context.now,
-    messages: ofLead(context.data.messages).sort(
-      (a, b) => a.timestamp.getTime() - b.timestamp.getTime(),
-    ),
-    followups: ofLead(context.data.followups).sort(
-      (a, b) => b.scheduledFor.getTime() - a.scheduledFor.getTime(),
-    ),
-    suggestions: ofLead(context.data.suggestions).sort(
-      (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
-    ),
-    events: ofLead(context.data.events).sort(
-      (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
-    ),
-    sale: ofLead(context.data.sales)[0] ?? null,
+    messages: messageRows,
+    followups: followupRows,
+    suggestions: suggestionRows,
+    events: eventRows,
+    sale: saleRows[0] ?? null,
   };
 }

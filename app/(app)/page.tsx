@@ -13,7 +13,6 @@ import { Suspense } from "react";
 
 import { QueueSection } from "@/components/dashboard/queue-section";
 import { StatCard } from "@/components/dashboard/stat-card";
-import { DemoNotice } from "@/components/layout/demo-notice";
 import { PageContainer, PageHeader } from "@/components/layout/page";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -48,7 +47,6 @@ async function Dashboard() {
             : `${formatWeekday(now)}. ${queueSize} ${queueSize === 1 ? "pessoa precisa" : "pessoas precisam"} da sua atenção hoje.`
         }
       />
-      <DemoNotice />
 
       <section aria-label="Indicadores" className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard

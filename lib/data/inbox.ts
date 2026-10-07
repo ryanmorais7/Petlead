@@ -1,15 +1,12 @@
 import "server-only";
 
-import type { Message } from "@/db/schema";
-import type { SuggestionTones } from "@/lib/mock/dataset";
+import { asc, eq } from "drizzle-orm";
 
-import { buildOverview, buildOverviews, loadContext, type LeadOverview } from "./source";
+import { messages, type Message } from "@/db/schema";
 
-export type InboxThread = LeadOverview & {
-  messages: Message[];
-  /** Alternative wordings of the current suggestion. */
-  tones: SuggestionTones;
-};
+import { loadContext, loadOverviews, type LeadOverview } from "./source";
+
+export type InboxThread = LeadOverview & { messages: Message[] };
 
 export type Inbox = {
   now: Date;
@@ -21,25 +18,28 @@ export type Inbox = {
 
 export async function getInbox(selectedLeadId?: string): Promise<Inbox> {
   const context = await loadContext();
+  const overviews = await loadOverviews(context);
 
-  const conversations = buildOverviews(context)
+  const conversations = overviews
     .filter((item) => item.lastMessage !== null)
     .sort(
       (a, b) =>
         (b.lastMessage?.timestamp.getTime() ?? 0) - (a.lastMessage?.timestamp.getTime() ?? 0),
     );
 
-  const lead = selectedLeadId
-    ? context.data.leads.find((item) => item.id === selectedLeadId)
+  // Looking the lead up in the seller's own list also enforces ownership.
+  const overview = selectedLeadId
+    ? overviews.find((item) => item.lead.id === selectedLeadId)
     : undefined;
 
-  const selected: InboxThread | null = lead
+  const selected: InboxThread | null = overview
     ? {
-        ...buildOverview(lead, context),
-        messages: context.data.messages
-          .filter((message) => message.leadId === lead.id)
-          .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime()),
-        tones: context.data.suggestionTones[lead.id] ?? {},
+        ...overview,
+        messages: await context.db
+          .select()
+          .from(messages)
+          .where(eq(messages.leadId, overview.lead.id))
+          .orderBy(asc(messages.timestamp)),
       }
     : null;
 

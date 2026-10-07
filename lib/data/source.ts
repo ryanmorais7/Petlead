@@ -1,28 +1,34 @@
 import "server-only";
 
+import { and, asc, desc, eq, inArray, isNull, type SQL } from "drizzle-orm";
 import { connection } from "next/server";
 
-import type {
-  AiSuggestion,
-  ConversationSummary,
-  Followup,
-  Lead,
-  Message,
-  User,
+import { getDb, type Database } from "@/db";
+import {
+  aiSuggestions,
+  conversationSummaries,
+  followups,
+  leads,
+  messages,
+  type AiSuggestion,
+  type ConversationSummary,
+  type Followup,
+  type Lead,
+  type Message,
+  type User,
 } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth/session";
-import { OPEN_FOLLOWUP_STATUSES, type FollowupStatus } from "@/lib/domain/enums";
+import { OPEN_FOLLOWUP_STATUSES } from "@/lib/domain/enums";
+import { calendarDaysBetween } from "@/lib/format";
 import { isActiveLead } from "@/lib/leads/contact-policy";
 import { getQueuePriority, type QueuePriority } from "@/lib/leads/priority";
-import { buildMockDataset, type Dataset } from "@/lib/mock/dataset";
 
 /**
- * Everything the screens read goes through lib/data. Today the source is the
- * demonstration dataset; replacing it with Drizzle queries will not change the
- * pages, only the functions of this folder.
+ * Everything the screens read goes through lib/data, always scoped to the
+ * signed-in seller.
  */
 
-export type DataContext = { user: User; now: Date; data: Dataset };
+export type DataContext = { user: User; now: Date; db: Database };
 
 /** A lead with the derived information most screens need. */
 export type LeadOverview = {
@@ -40,65 +46,29 @@ export type LeadOverview = {
 export async function loadContext(): Promise<DataContext> {
   // Sales data is per seller and changes all the time: always read at request time.
   await connection();
-
-  const user = await getCurrentUser();
-  const now = new Date();
-  const data = buildMockDataset(now);
-  const ownLeadIds = new Set(
-    data.leads.filter((lead) => lead.ownerUserId === user.id).map((lead) => lead.id),
-  );
-  const own = <T extends { leadId: string }>(rows: T[]) =>
-    rows.filter((row) => ownLeadIds.has(row.leadId));
-
-  return {
-    user,
-    now,
-    data: {
-      ...data,
-      leads: data.leads.filter((lead) => ownLeadIds.has(lead.id)),
-      conversations: own(data.conversations),
-      messages: own(data.messages),
-      summaries: own(data.summaries),
-      suggestions: own(data.suggestions),
-      followups: own(data.followups),
-      events: own(data.events),
-      sales: own(data.sales),
-    },
-  };
+  return { user: await getCurrentUser(), now: new Date(), db: getDb() };
 }
 
-function isOpenFollowup(followup: Followup): boolean {
-  return (OPEN_FOLLOWUP_STATUSES as readonly FollowupStatus[]).includes(followup.status);
-}
+type OverviewParts = {
+  summary: ConversationSummary | null;
+  lastMessage: Message | null;
+  nextFollowup: Followup | null;
+  suggestion: AiSuggestion | null;
+};
 
-export function buildOverview(lead: Lead, { data, now }: DataContext): LeadOverview {
-  const messages = data.messages
-    .filter((message) => message.leadId === lead.id)
-    .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
-  const lastMessage = messages.at(-1) ?? null;
+function buildOverview(lead: Lead, parts: OverviewParts, now: Date): LeadOverview {
+  // Closed, lost and do-not-contact leads never carry pending work.
   const active = isActiveLead(lead);
-
-  const nextFollowup = active
-    ? (data.followups
-        .filter((followup) => followup.leadId === lead.id && isOpenFollowup(followup))
-        .sort((a, b) => a.scheduledFor.getTime() - b.scheduledFor.getTime())[0] ?? null)
-    : null;
-
-  const suggestion = active
-    ? (data.suggestions
-        .filter((item) => item.leadId === lead.id && item.sentAt === null)
-        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0] ?? null)
-    : null;
-
-  const awaitingReply = active && lastMessage?.direction === "INBOUND";
+  const nextFollowup = active ? parts.nextFollowup : null;
+  const awaitingReply = active && parts.lastMessage?.direction === "INBOUND";
 
   return {
     lead,
-    summary: data.summaries.find((summary) => summary.leadId === lead.id) ?? null,
-    lastMessage,
+    summary: parts.summary,
+    lastMessage: parts.lastMessage,
     awaitingReply,
     nextFollowup,
-    suggestion,
+    suggestion: active ? parts.suggestion : null,
     priority: getQueuePriority(
       {
         status: lead.status,
@@ -107,13 +77,80 @@ export function buildOverview(lead: Lead, { data, now }: DataContext): LeadOverv
         doNotContact: lead.doNotContact,
         lastContactAt: lead.lastContactAt,
         awaitingReply,
-        nextFollowup,
+        nextFollowup: nextFollowup && {
+          scheduledFor: nextFollowup.scheduledFor,
+          reason: nextFollowup.reason,
+          // The seller scheduled it knowing about the customer's last message.
+          setAfterLastMessage:
+            parts.lastMessage === null || nextFollowup.updatedAt > parts.lastMessage.timestamp,
+        },
       },
       now,
     ),
   };
 }
 
-export function buildOverviews(context: DataContext): LeadOverview[] {
-  return context.data.leads.map((lead) => buildOverview(lead, context));
+function firstByLead<T extends { leadId: string }>(rows: T[]): Map<string, T> {
+  const map = new Map<string, T>();
+  for (const row of rows) {
+    if (!map.has(row.leadId)) map.set(row.leadId, row);
+  }
+  return map;
+}
+
+/** Loads the seller's leads, optionally filtered, with their derived information. */
+export async function loadOverviews(
+  { db, user, now }: DataContext,
+  where?: SQL,
+): Promise<LeadOverview[]> {
+  const leadRows = await db
+    .select()
+    .from(leads)
+    .where(and(eq(leads.ownerUserId, user.id), where));
+  if (leadRows.length === 0) return [];
+
+  const ids = leadRows.map((lead) => lead.id);
+  const [summaryRows, lastMessages, openFollowups, pendingSuggestions] = await Promise.all([
+    db.select().from(conversationSummaries).where(inArray(conversationSummaries.leadId, ids)),
+    db
+      .selectDistinctOn([messages.leadId])
+      .from(messages)
+      .where(inArray(messages.leadId, ids))
+      .orderBy(messages.leadId, desc(messages.timestamp)),
+    db
+      .select()
+      .from(followups)
+      .where(
+        and(inArray(followups.leadId, ids), inArray(followups.status, [...OPEN_FOLLOWUP_STATUSES])),
+      )
+      .orderBy(asc(followups.scheduledFor)),
+    db
+      .select()
+      .from(aiSuggestions)
+      .where(and(inArray(aiSuggestions.leadId, ids), isNull(aiSuggestions.sentAt)))
+      .orderBy(desc(aiSuggestions.createdAt)),
+  ]);
+
+  const summaryByLead = firstByLead(summaryRows);
+  const messageByLead = firstByLead(lastMessages);
+  const followupByLead = firstByLead(openFollowups);
+  const suggestionByLead = firstByLead(pendingSuggestions);
+
+  return leadRows.map((lead) =>
+    buildOverview(
+      lead,
+      {
+        summary: summaryByLead.get(lead.id) ?? null,
+        lastMessage: messageByLead.get(lead.id) ?? null,
+        nextFollowup: followupByLead.get(lead.id) ?? null,
+        suggestion: suggestionByLead.get(lead.id) ?? null,
+      },
+      now,
+    ),
+  );
+}
+
+/** True when the follow-up is due today or overdue. */
+export function isDueToday(followup: Followup, now: Date): boolean {
+  return calendarDaysBetween(followup.scheduledFor, now) >= 0;
 }

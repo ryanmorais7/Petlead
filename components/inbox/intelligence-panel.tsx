@@ -22,7 +22,7 @@ function Block({ title, children }: { title: string; children: ReactNode }) {
 
 /** Right column of the inbox: what we know about the customer and what to do next. */
 export function IntelligencePanel({ thread }: { thread: InboxThread }) {
-  const { lead, summary, suggestion, tones } = thread;
+  const { lead, summary, suggestion } = thread;
   const blocked = isContactBlocked(lead);
 
   return (
@@ -76,7 +76,7 @@ export function IntelligencePanel({ thread }: { thread: InboxThread }) {
               key={suggestion.id}
               phone={lead.phone}
               content={suggestion.content}
-              tones={tones}
+              tones={suggestion.variants ?? {}}
             />
           </>
         ) : (
