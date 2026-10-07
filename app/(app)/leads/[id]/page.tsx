@@ -1,4 +1,4 @@
-import { ArrowLeft, Ban, CheckCircle2, MessageCircle, MessagesSquare, PenLine } from "lucide-react";
+import { ArrowLeft, Ban, MessageCircle, MessagesSquare, PenLine } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -6,13 +6,13 @@ import { Suspense, type ReactNode } from "react";
 
 import { MessageThread } from "@/components/conversation/message-thread";
 import { PageContainer } from "@/components/layout/page";
+import { LeadActions } from "@/components/leads/lead-actions";
 import { StatusBadge, TemperatureBadge } from "@/components/leads/lead-badges";
 import { LeadTimeline } from "@/components/leads/lead-timeline";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { buttonStyles } from "@/components/ui/button";
 import { SectionCard } from "@/components/ui/card";
-import { PendingAction } from "@/components/ui/pending-action";
 import { ScoreMeter } from "@/components/ui/score-meter";
 import { PageSkeleton } from "@/components/ui/skeleton";
 import { getLeadProfile } from "@/lib/data/leads";
@@ -31,7 +31,7 @@ import {
   formatRelativeDay,
   whatsappLink,
 } from "@/lib/format";
-import { isContactBlocked } from "@/lib/leads/contact-policy";
+import { isActiveLead, isContactBlocked } from "@/lib/leads/contact-policy";
 import { leadIdSchema } from "@/lib/validations/lead";
 
 export const metadata: Metadata = { title: "Lead" };
@@ -110,19 +110,10 @@ async function LeadProfile({ params }: { params: PageProps<"/leads/[id]">["param
               WhatsApp
             </a>
           )}
-          {lead.status === "CLOSED" || blocked ? null : (
-            <>
-              <PendingAction requires="o banco de dados">
-                <CheckCircle2 aria-hidden />
-                Marcar como fechado
-              </PendingAction>
-              <PendingAction requires="o banco de dados" variant="danger">
-                <Ban aria-hidden />
-                Não contatar
-              </PendingAction>
-            </>
-          )}
         </div>
+        {isActiveLead(lead) ? (
+          <LeadActions leadId={lead.id} leadName={lead.name} density="full" className="w-full" />
+        ) : null}
       </header>
 
       {blocked ? (

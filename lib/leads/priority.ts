@@ -25,7 +25,12 @@ type PriorityInput = {
   /** The customer wrote last and is still waiting for an answer. */
   awaitingReply: boolean;
   /** Earliest open follow-up of the lead, if any. */
-  nextFollowup: { scheduledFor: Date; reason: string } | null;
+  nextFollowup: {
+    scheduledFor: Date;
+    reason: string;
+    /** Scheduled or postponed after the customer's last message. */
+    setAfterLastMessage: boolean;
+  } | null;
 };
 
 const BUCKET_WEIGHT: Record<QueueBucket, number> = { HIGH: 3000, MEDIUM: 2000, REACTIVATION: 1000 };
@@ -47,12 +52,22 @@ function build(bucket: QueueBucket, reason: string, score: number): QueuePriorit
 export function getQueuePriority(lead: PriorityInput, now: Date): QueuePriority | null {
   if (!isActiveLead(lead)) return null;
 
-  if (lead.awaitingReply) {
+  const dueToday =
+    lead.nextFollowup !== null &&
+    calendarDaysBetween(lead.nextFollowup.scheduledFor, now) >= 0;
+  // The seller already saw the last message and chose a later date for it.
+  const postponed =
+    lead.nextFollowup !== null && !dueToday && lead.nextFollowup.setAfterLastMessage;
+
+  const silentDays = lead.lastContactAt ? calendarDaysBetween(lead.lastContactAt, now) : 0;
+  // An unanswered message from weeks ago is no longer urgent: it is a reactivation.
+  const stale = silentDays >= followupConfig.reactivationAfterDays;
+
+  if (lead.awaitingReply && !postponed && !stale) {
     return build("HIGH", "Cliente aguardando a sua resposta", lead.leadScore);
   }
 
   if (lead.nextFollowup) {
-    const dueToday = calendarDaysBetween(lead.nextFollowup.scheduledFor, now) >= 0;
     // A follow-up scheduled for later means the customer asked for time: do not insist.
     if (!dueToday) return null;
 
@@ -63,15 +78,16 @@ export function getQueuePriority(lead: PriorityInput, now: Date): QueuePriority 
     return build(urgent ? "HIGH" : "MEDIUM", lead.nextFollowup.reason, lead.leadScore);
   }
 
-  if (lead.lastContactAt) {
-    const silentDays = calendarDaysBetween(lead.lastContactAt, now);
-    if (silentDays >= followupConfig.reactivationAfterDays) {
-      return build(
-        "REACTIVATION",
-        `Sem contato há ${silentDays} dias. Reativação amigável, sem pressão.`,
-        lead.leadScore,
-      );
-    }
+  if (!lead.lastContactAt) {
+    return build("MEDIUM", "Lead novo, ainda sem nenhum contato.", lead.leadScore);
+  }
+
+  if (stale) {
+    return build(
+      "REACTIVATION",
+      `Sem contato há ${silentDays} dias. Reativação amigável, sem pressão.`,
+      lead.leadScore,
+    );
   }
 
   return null;

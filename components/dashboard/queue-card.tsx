@@ -1,6 +1,7 @@
-import { Ban, CheckCircle2, Clock, MessageCircle, MessagesSquare, PenLine, Sparkles } from "lucide-react";
+import { MessageCircle, MessagesSquare, PenLine, Sparkles } from "lucide-react";
 import Link from "next/link";
 
+import { LeadActions } from "@/components/leads/lead-actions";
 import { StatusBadge, TemperatureBadge } from "@/components/leads/lead-badges";
 import { Avatar } from "@/components/ui/avatar";
 import { buttonStyles } from "@/components/ui/button";
@@ -94,20 +95,11 @@ export function QueueCard({ item, now }: { item: QueueItem; now: Date }) {
           WhatsApp
         </a>
       </div>
-      <div className="mt-3 flex flex-wrap gap-1 border-t border-zinc-100 pt-3">
-        <PendingAction requires="o banco de dados" variant="ghost" size="sm">
-          <Clock aria-hidden />
-          Adiar
-        </PendingAction>
-        <PendingAction requires="o banco de dados" variant="ghost" size="sm">
-          <CheckCircle2 aria-hidden />
-          Fechado
-        </PendingAction>
-        <PendingAction requires="o banco de dados" variant="ghost" size="sm">
-          <Ban aria-hidden />
-          Não contatar
-        </PendingAction>
-      </div>
+      <LeadActions
+        leadId={lead.id}
+        leadName={lead.name}
+        className="mt-3 border-t border-zinc-100 pt-3"
+      />
     </Card>
   );
 }
