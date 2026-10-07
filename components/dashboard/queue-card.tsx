@@ -15,7 +15,7 @@ export function QueueCard({ item, now }: { item: QueueItem; now: Date }) {
   const conversationHref = `/inbox?c=${lead.id}`;
 
   return (
-    <Card className="p-4 sm:p-5">
+    <Card className="flex flex-col p-4 sm:p-5">
       <div className="flex items-start gap-3">
         <Avatar name={lead.name} />
         <div className="min-w-0 flex-1">
@@ -67,7 +67,8 @@ export function QueueCard({ item, now }: { item: QueueItem; now: Date }) {
         </div>
       ) : null}
 
-      <div className="mt-4 flex flex-wrap gap-2">
+      {/* Pushes the actions to the bottom so cards in the same row line up. */}
+      <div className="mt-auto flex flex-wrap gap-2 pt-4">
         {suggestion ? (
           <Link href={conversationHref} className={buttonStyles({ variant: "primary", size: "sm" })}>
             <PenLine aria-hidden />
@@ -92,7 +93,8 @@ export function QueueCard({ item, now }: { item: QueueItem; now: Date }) {
           <MessageCircle aria-hidden />
           WhatsApp
         </a>
-        <span className="hidden flex-1 sm:block" />
+      </div>
+      <div className="mt-3 flex flex-wrap gap-1 border-t border-zinc-100 pt-3">
         <PendingAction requires="o banco de dados" variant="ghost" size="sm">
           <Clock aria-hidden />
           Adiar
