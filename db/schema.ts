@@ -64,7 +64,13 @@ export const webhookEventStatusEnum = pgEnum("webhook_event_status", WEBHOOK_EVE
 export const users = pgTable("users", {
   id: uuid().primaryKey().defaultRandom(),
   name: text().notNull(),
+  /** Always stored in lower case. */
   email: text().notNull().unique(),
+  /** Salted scrypt hash. Null means the account cannot sign in yet. */
+  passwordHash: text(),
+  failedLoginAttempts: integer().notNull().default(0),
+  /** Set after too many wrong passwords; sign-in is refused until this moment. */
+  lockedUntil: timestamptz(),
   role: userRoleEnum().notNull().default("SELLER"),
   createdAt: createdAt(),
   updatedAt: updatedAt(),

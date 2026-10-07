@@ -15,6 +15,13 @@
       "when": 1791337696549,
       "tag": "0001_suggestion_variants",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791363995278,
+      "tag": "0002_user_credentials",
+      "breakpoints": true
     }
   ]
 }
