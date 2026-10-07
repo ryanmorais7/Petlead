@@ -15,8 +15,12 @@ As telas leem e gravam no banco de dados:
 - **Leads** (`/leads`): lista com busca e filtros, e cadastro manual em `/leads/novo`.
 - **Perfil do lead** (`/leads/[id]`): dados, resumo, mensagens, follow-ups, venda e histórico.
 
-O acesso exige login com e-mail e senha. Ainda não conectados: WhatsApp Business
-Platform e geração de mensagens.
+O acesso exige login com e-mail e senha.
+
+A integração com a WhatsApp Business Platform (webhook, envio, janela de 24 horas) está
+implementada e testada, aguardando apenas o número real e as credenciais: veja
+[docs/whatsapp-setup.md](docs/whatsapp-setup.md). A geração de mensagens ainda não foi
+conectada.
 
 ## Stack
 
@@ -56,6 +60,8 @@ datas atualizadas e `npm run db:seed:clear` os remove, sem tocar nos leads reais
 | `npm run start`       | Executa o build de produção                       |
 | `npm run lint`        | ESLint                                            |
 | `npm run typecheck`   | Gera os tipos de rotas e roda o TypeScript        |
+| `npm test`            | Testes automatizados (Postgres em memória)        |
+| `npm run whatsapp:simulate -- <exemplo>` | Entrega um webhook de exemplo ao servidor local |
 | `npm run db:generate` | Gera uma migration a partir de `db/schema.ts`     |
 | `npm run db:migrate`  | Aplica as migrations no banco de `DATABASE_URL`   |
 | `npm run db:studio`   | Abre o Drizzle Studio                             |
@@ -112,7 +118,10 @@ lib/
   followups/          Configuração da cadência de follow-up
   validations/        Schemas Zod (formulários, API, webhook, análise)
   ai/                 Contrato do provider de sugestões
-  auth/               Usuário atual
+  auth/               Senha, sessão e usuário atual
+  whatsapp/           Webhook, envio, janela de 24 horas e regras de envio
+tests/                Testes e exemplos de webhook (fixtures)
+docs/                 Guias de configuração
 ```
 
 ## Regras que o código garante
@@ -127,3 +136,6 @@ lib/
 - **Score é recomendação**: ordena a fila, mas nunca dispara envio.
 - **Idempotência**: `messages.whatsapp_message_id` é único, para que um webhook
   reenviado não duplique mensagens.
+- **Webhook autenticado**: só são processadas requisições assinadas com o App Secret.
+- **Janela de 24 horas**: mensagem livre só sai até 24 horas depois da última mensagem do
+  cliente; o servidor confere antes de cada envio.
