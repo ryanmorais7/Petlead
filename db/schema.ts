@@ -136,7 +136,9 @@ export const conversations = pgTable(
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
-  (table) => [index("conversations_lead_idx").on(table.leadId)],
+  // One WhatsApp thread per lead. The uniqueness makes get-or-create safe
+  // when two webhooks for the same customer arrive at the same time.
+  (table) => [uniqueIndex("conversations_lead_idx").on(table.leadId)],
 );
 
 export const messages = pgTable(

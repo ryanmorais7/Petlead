@@ -5,6 +5,9 @@ export const ERROR_CODES = [
   "NOT_FOUND",
   "UNAUTHORIZED",
   "CONTACT_BLOCKED",
+  "WHATSAPP_NOT_CONFIGURED",
+  "WINDOW_CLOSED",
+  "WINDOW_UNKNOWN",
   "INTEGRATION",
   "UNEXPECTED",
 ] as const;
@@ -15,6 +18,11 @@ const USER_MESSAGES: Record<ErrorCode, string> = {
   NOT_FOUND: "Não encontramos o que você procura.",
   UNAUTHORIZED: "Você precisa entrar na sua conta para continuar.",
   CONTACT_BLOCKED: "Este cliente pediu para não ser contatado.",
+  WHATSAPP_NOT_CONFIGURED: "WhatsApp ainda não conectado.",
+  WINDOW_CLOSED:
+    "Fora da janela de 24h. Só é possível enviar mensagem livre até 24 horas depois da última mensagem do cliente.",
+  WINDOW_UNKNOWN:
+    "Este cliente ainda não escreveu para você pelo WhatsApp. A primeira mensagem precisa partir dele.",
   INTEGRATION: "Um serviço externo não respondeu. Tente novamente em instantes.",
   UNEXPECTED: "Algo deu errado por aqui. Tente novamente em instantes.",
 };
@@ -24,6 +32,9 @@ const HTTP_STATUS: Record<ErrorCode, number> = {
   NOT_FOUND: 404,
   UNAUTHORIZED: 401,
   CONTACT_BLOCKED: 409,
+  WHATSAPP_NOT_CONFIGURED: 503,
+  WINDOW_CLOSED: 409,
+  WINDOW_UNKNOWN: 409,
   INTEGRATION: 502,
   UNEXPECTED: 500,
 };
@@ -51,6 +62,10 @@ export function toErrorCode(error: unknown): ErrorCode {
 /** Friendly message in Portuguese. Never exposes technical details. */
 export function toUserMessage(error: unknown): string {
   return USER_MESSAGES[toErrorCode(error)];
+}
+
+export function userMessageFor(code: ErrorCode): string {
+  return USER_MESSAGES[code];
 }
 
 export function toHttpStatus(error: unknown): number {
