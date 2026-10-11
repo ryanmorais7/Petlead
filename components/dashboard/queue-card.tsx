@@ -8,10 +8,17 @@ import { buttonStyles } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { PendingAction } from "@/components/ui/pending-action";
 import { ScoreMeter } from "@/components/ui/score-meter";
-import type { QueueItem } from "@/lib/data/dashboard";
+import type { LeadOverview } from "@/lib/data/source";
 import { formatPets, formatPhone, formatRelativeDay, whatsappLink } from "@/lib/format";
 
-export function QueueCard({ item, now }: { item: QueueItem; now: Date }) {
+type QueueCardProps = {
+  item: LeadOverview;
+  now: Date;
+  /** Shown when the conversation summary has no recommended action yet. */
+  recommendation?: string;
+};
+
+export function QueueCard({ item, now, recommendation }: QueueCardProps) {
   const { lead, summary, suggestion, priority } = item;
   const conversationHref = `/inbox?c=${lead.id}`;
 
@@ -53,7 +60,7 @@ export function QueueCard({ item, now }: { item: QueueItem; now: Date }) {
         <div className="flex gap-2">
           <dt className="w-28 shrink-0 text-xs font-medium text-zinc-500 sm:w-32">Recomendação</dt>
           <dd className="font-medium text-zinc-900">
-            {summary?.recommendedNextAction ?? priority.reason}
+            {summary?.recommendedNextAction ?? recommendation ?? priority?.reason ?? "—"}
           </dd>
         </div>
       </dl>
