@@ -11,6 +11,7 @@ import {
   sales,
   type AiSuggestion,
   type Followup,
+  type Lead,
   type LeadEvent,
   type Message,
   type Sale,
@@ -64,6 +65,17 @@ export async function listLeads(filters: LeadFilters = {}): Promise<LeadList> {
     );
 
   return { now: context.now, total: totalRow?.value ?? 0, items };
+}
+
+/** The lead as stored, for the edit form. Null when it is not the seller's. */
+export async function getLeadForEdit(leadId: string): Promise<Lead | null> {
+  const { db, user } = await loadContext();
+  const [lead] = await db
+    .select()
+    .from(leads)
+    .where(and(eq(leads.id, leadId), eq(leads.ownerUserId, user.id)))
+    .limit(1);
+  return lead ?? null;
 }
 
 export type LeadProfile = LeadOverview & {

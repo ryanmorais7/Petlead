@@ -3,8 +3,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { PageContainer, PageHeader } from "@/components/layout/page";
-import { NewLeadForm } from "@/components/leads/new-lead-form";
+import { LeadForm } from "@/components/leads/lead-form";
 import { Card } from "@/components/ui/card";
+import { createLead } from "@/lib/actions/leads";
 
 export const metadata: Metadata = { title: "Novo lead" };
 
@@ -23,7 +24,7 @@ export default function NewLeadPage() {
         description="Cadastre um contato que ainda não conversou pelo WhatsApp conectado."
       />
       <Card className="p-4 sm:p-6">
-        <NewLeadForm />
+        <LeadForm action={createLead} submitLabel="Salvar lead" cancelHref="/leads" />
       </Card>
     </PageContainer>
   );

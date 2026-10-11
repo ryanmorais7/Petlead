@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useActionState, type ReactNode } from "react";
 
 import { Button, buttonStyles } from "@/components/ui/button";
-import { createLead, type LeadFormState } from "@/lib/actions/leads";
+import type { LeadFormState } from "@/lib/actions/leads";
 import { LEAD_SOURCES } from "@/lib/domain/enums";
 import { LEAD_SOURCE_LABELS } from "@/lib/domain/labels";
 import { cn } from "@/lib/utils";
@@ -43,10 +43,20 @@ function Field({ name, label, error, hint, className, children }: FieldProps) {
   );
 }
 
-export function NewLeadForm() {
-  const [state, formAction, pending] = useActionState<LeadFormState, FormData>(createLead, {});
+type LeadFormProps = {
+  /** Server action that saves the form: create or update. */
+  action: (state: LeadFormState, formData: FormData) => Promise<LeadFormState>;
+  /** Current values when editing an existing lead. */
+  initialValues?: Record<string, string>;
+  submitLabel: string;
+  cancelHref: string;
+};
+
+export function LeadForm({ action, initialValues, submitLabel, cancelHref }: LeadFormProps) {
+  const [state, formAction, pending] = useActionState<LeadFormState, FormData>(action, {});
   const errors = state.fieldErrors ?? {};
-  const values = state.values ?? {};
+  // After a failed submission, show what was typed instead of the stored values.
+  const values = state.values ?? initialValues ?? {};
 
   return (
     <form action={formAction} className="grid gap-4 sm:grid-cols-2" noValidate>
@@ -137,6 +147,24 @@ export function NewLeadForm() {
         )}
       </Field>
 
+      <Field
+        name="mainObjection"
+        label="Objeção principal"
+        error={errors.mainObjection}
+        hint="O que está impedindo o fechamento, se houver."
+        className="sm:col-span-2"
+      >
+        {(props) => (
+          <input
+            {...props}
+            type="text"
+            autoComplete="off"
+            defaultValue={values.mainObjection}
+            className={INPUT}
+          />
+        )}
+      </Field>
+
       <Field name="notes" label="Observações" error={errors.notes} className="sm:col-span-2">
         {(props) => <textarea {...props} rows={3} defaultValue={values.notes} className={INPUT} />}
       </Field>
@@ -149,9 +177,9 @@ export function NewLeadForm() {
 
       <div className="flex flex-wrap gap-2 sm:col-span-2">
         <Button type="submit" variant="primary" disabled={pending}>
-          {pending ? "Salvando..." : "Salvar lead"}
+          {pending ? "Salvando..." : submitLabel}
         </Button>
-        <Link href="/leads" className={buttonStyles({ variant: "ghost" })}>
+        <Link href={cancelHref} className={buttonStyles({ variant: "ghost" })}>
           Cancelar
         </Link>
       </div>

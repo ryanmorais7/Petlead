@@ -1,6 +1,6 @@
 "use server";
 
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, ne } from "drizzle-orm";
 import { refresh } from "next/cache";
 import { redirect, unstable_rethrow } from "next/navigation";
 
@@ -11,7 +11,7 @@ import { OPEN_FOLLOWUP_STATUSES } from "@/lib/domain/enums";
 import { AppError, toUserMessage } from "@/lib/errors";
 import { isActiveLead, isContactBlocked } from "@/lib/leads/contact-policy";
 import { logger } from "@/lib/logger";
-import { snoozeFollowupRequestSchema } from "@/lib/validations/api";
+import { snoozeFollowupRequestSchema, updateLeadStatusRequestSchema } from "@/lib/validations/api";
 import { leadFormSchema, leadIdSchema } from "@/lib/validations/lead";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -163,10 +163,21 @@ function text(formData: FormData, key: string): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-/** Creates a lead typed in by the seller. Redirects to its profile on success. */
-export async function createLead(_previous: LeadFormState, formData: FormData): Promise<LeadFormState> {
-  const fields = ["name", "phone", "email", "source", "petCount", "petNames", "planInterest", "notes"];
-  const values = Object.fromEntries(fields.map((field) => [field, text(formData, field)]));
+const FORM_FIELDS = [
+  "name",
+  "phone",
+  "email",
+  "source",
+  "petCount",
+  "petNames",
+  "planInterest",
+  "mainObjection",
+  "notes",
+] as const;
+
+/** Reads and validates the lead form shared by the create and edit screens. */
+function parseLeadForm(formData: FormData) {
+  const values = Object.fromEntries(FORM_FIELDS.map((field) => [field, text(formData, field)]));
 
   const parsed = leadFormSchema.safeParse({
     name: values.name,
@@ -179,23 +190,31 @@ export async function createLead(_previous: LeadFormState, formData: FormData): 
       .map((name) => name.trim())
       .filter(Boolean),
     planInterest: values.planInterest || undefined,
+    mainObjection: values.mainObjection || undefined,
     notes: values.notes || undefined,
   });
 
-  if (!parsed.success) {
-    const fieldErrors: Record<string, string> = {};
-    for (const issue of parsed.error.issues) {
-      const field = String(issue.path[0] ?? "");
-      if (field && !fieldErrors[field]) fieldErrors[field] = issue.message;
-    }
-    return { message: "Revise os campos destacados.", fieldErrors, values };
+  if (parsed.success) return { ok: true as const, data: parsed.data, values };
+
+  const fieldErrors: Record<string, string> = {};
+  for (const issue of parsed.error.issues) {
+    const field = String(issue.path[0] ?? "");
+    if (field && !fieldErrors[field]) fieldErrors[field] = issue.message;
   }
+  const state: LeadFormState = { message: "Revise os campos destacados.", fieldErrors, values };
+  return { ok: false as const, state, values };
+}
+
+/** Creates a lead typed in by the seller. Redirects to its profile on success. */
+export async function createLead(_previous: LeadFormState, formData: FormData): Promise<LeadFormState> {
+  const form = parseLeadForm(formData);
+  if (!form.ok) return form.state;
+  const { data, values } = form;
 
   let leadId: string;
   try {
     const user = await getCurrentUser();
     const db = getDb();
-    const data = parsed.data;
 
     const [existing] = await db
       .select({ id: leads.id })
@@ -221,6 +240,7 @@ export async function createLead(_previous: LeadFormState, formData: FormData): 
         petCount: data.petCount ?? (data.petNames.length > 0 ? data.petNames.length : null),
         petNames: data.petNames,
         planInterest: data.planInterest ?? null,
+        mainObjection: data.mainObjection ?? null,
         notes: data.notes ?? null,
       })
       .returning({ id: leads.id });
@@ -239,4 +259,120 @@ export async function createLead(_previous: LeadFormState, formData: FormData): 
   }
 
   redirect(`/leads/${leadId}`);
+}
+
+/** Saves the edit form of an existing lead. The lead id is bound on the server side of the form. */
+export async function updateLead(
+  leadId: string,
+  _previous: LeadFormState,
+  formData: FormData,
+): Promise<LeadFormState> {
+  const form = parseLeadForm(formData);
+  if (!form.ok) return form.state;
+  const { data, values } = form;
+
+  try {
+    const { lead } = await getOwnedLead(leadIdSchema.parse(leadId));
+    const db = getDb();
+
+    if (data.phone !== lead.phone) {
+      const [taken] = await db
+        .select({ id: leads.id })
+        .from(leads)
+        .where(and(eq(leads.ownerUserId, lead.ownerUserId), eq(leads.phone, data.phone), ne(leads.id, lead.id)))
+        .limit(1);
+      if (taken) {
+        return {
+          message: "Já existe outro lead com este telefone.",
+          fieldErrors: { phone: "Telefone já cadastrado." },
+          values,
+        };
+      }
+    }
+
+    await db
+      .update(leads)
+      .set({
+        name: data.name,
+        phone: data.phone,
+        email: data.email ?? null,
+        source: data.source,
+        petCount: data.petCount ?? (data.petNames.length > 0 ? data.petNames.length : null),
+        petNames: data.petNames,
+        planInterest: data.planInterest ?? null,
+        mainObjection: data.mainObjection ?? null,
+        notes: data.notes ?? null,
+      })
+      .where(eq(leads.id, lead.id));
+  } catch (error) {
+    unstable_rethrow(error);
+    logger.error("Action failed: updateLead", { error });
+    return { message: toUserMessage(error), values };
+  }
+
+  redirect(`/leads/${leadId}`);
+}
+
+/** Closes the lead without a sale, keeping the reason for the loss reports. */
+export async function markLeadLost(input: { leadId: string; reason: string }): Promise<ActionResult> {
+  return run("markLeadLost", async () => {
+    const { leadId, lostReason } = updateLeadStatusRequestSchema.parse({
+      leadId: input.leadId,
+      status: "LOST",
+      lostReason: input.reason,
+    });
+    const { lead, userId } = await getOwnedLead(leadId);
+    if (!isActiveLead(lead)) throw new AppError("VALIDATION", "Lead is not active");
+
+    const db = getDb();
+    await db.batch([
+      db
+        .update(leads)
+        .set({ status: "LOST", lostReason: lostReason || null, nextFollowupAt: null })
+        .where(eq(leads.id, leadId)),
+      db
+        .update(followups)
+        .set({ status: "CANCELLED" })
+        .where(and(eq(followups.leadId, leadId), inArray(followups.status, OPEN_STATUSES))),
+      db.insert(leadEvents).values({
+        leadId,
+        userId,
+        type: "STATUS_CHANGED",
+        description: lostReason ? `Marcado como perdido: ${lostReason}` : "Marcado como perdido.",
+      }),
+    ]);
+  });
+}
+
+/**
+ * Brings a closed, lost or blocked lead back to the pipeline. Undoing a sale
+ * removes its record; undoing "do not contact" is the seller's responsibility
+ * and is written to the lead history.
+ */
+export async function reopenLead(input: { leadId: string }): Promise<ActionResult> {
+  return run("reopenLead", async () => {
+    const leadId = leadIdSchema.parse(input.leadId);
+    const { lead, userId } = await getOwnedLead(leadId);
+    if (isActiveLead(lead)) return;
+
+    const db = getDb();
+    const description =
+      lead.status === "CLOSED"
+        ? "Venda desfeita. Lead reaberto."
+        : isContactBlocked(lead)
+          ? "Contato liberado novamente por você."
+          : "Lead reaberto.";
+
+    await db.batch([
+      db
+        .update(leads)
+        .set({ status: "FOLLOW_UP", doNotContact: false, lostReason: null })
+        .where(eq(leads.id, leadId)),
+      db.insert(leadEvents).values({ leadId, userId, type: "STATUS_CHANGED", description }),
+    ]);
+    // A sale is only undone when the lead being reopened is the closed one.
+    if (lead.status === "CLOSED") {
+      await db.delete(sales).where(and(eq(sales.leadId, leadId), eq(sales.ownerUserId, userId)));
+    }
+  });
 }

@@ -1,4 +1,4 @@
-import { ArrowLeft, Ban, MessageCircle, MessagesSquare, PenLine } from "lucide-react";
+import { ArrowLeft, Ban, MessageCircle, MessagesSquare, Pencil, PenLine } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -6,7 +6,7 @@ import { Suspense, type ReactNode } from "react";
 
 import { MessageThread } from "@/components/conversation/message-thread";
 import { PageContainer } from "@/components/layout/page";
-import { LeadActions } from "@/components/leads/lead-actions";
+import { LeadActions, ReopenLeadButton } from "@/components/leads/lead-actions";
 import { StatusBadge, TemperatureBadge } from "@/components/leads/lead-badges";
 import { LeadTimeline } from "@/components/leads/lead-timeline";
 import { Avatar } from "@/components/ui/avatar";
@@ -99,6 +99,10 @@ async function LeadProfile({ params }: { params: PageProps<"/leads/[id]">["param
             <MessagesSquare aria-hidden />
             Ver conversa
           </Link>
+          <Link href={`/leads/${lead.id}/editar`} className={buttonStyles()}>
+            <Pencil aria-hidden />
+            Editar
+          </Link>
           {blocked ? null : (
             <a
               href={whatsappLink(lead.phone)}
@@ -111,9 +115,13 @@ async function LeadProfile({ params }: { params: PageProps<"/leads/[id]">["param
             </a>
           )}
         </div>
-        {isActiveLead(lead) ? (
-          <LeadActions leadId={lead.id} leadName={lead.name} density="full" className="w-full" />
-        ) : null}
+        <div className="w-full">
+          {isActiveLead(lead) ? (
+            <LeadActions leadId={lead.id} leadName={lead.name} density="full" />
+          ) : (
+            <ReopenLeadButton leadId={lead.id} leadName={lead.name} status={lead.status} />
+          )}
+        </div>
       </header>
 
       {blocked ? (
