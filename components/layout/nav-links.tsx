@@ -1,6 +1,6 @@
 "use client";
 
-import { Inbox, LayoutDashboard, Users, type LucideIcon } from "lucide-react";
+import { BarChart3, History, Inbox, LayoutDashboard, Users, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -12,6 +12,8 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Hoje", icon: LayoutDashboard },
   { href: "/inbox", label: "Conversas", icon: Inbox },
   { href: "/leads", label: "Leads", icon: Users },
+  { href: "/esquecidos", label: "Esquecidos", icon: History },
+  { href: "/metricas", label: "Métricas", icon: BarChart3 },
 ];
 
 function isActive(pathname: string | null, href: string): boolean {
@@ -50,7 +52,7 @@ export function SidebarLinks({ pathname }: { pathname: string | null }) {
 /** Bottom tab bar used on phones. */
 export function TabBarLinks({ pathname }: { pathname: string | null }) {
   return (
-    <ul className="grid h-16 grid-cols-3">
+    <ul className="grid h-16 grid-cols-5">
       {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
         const active = isActive(pathname, href);
         return (
