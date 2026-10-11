@@ -1,12 +1,13 @@
 "use client";
 
-import { Ban, CheckCircle2, Clock, RotateCcw, XCircle } from "lucide-react";
+import { Ban, CheckCheck, CheckCircle2, Clock, RotateCcw, XCircle } from "lucide-react";
 import { useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
   closeLead,
   markLeadLost,
+  registerContact,
   reopenLead,
   setDoNotContact,
   snoozeLead,
@@ -79,6 +80,16 @@ export function LeadActions({ leadId, leadName, density = "compact", className }
   return (
     <div className={className}>
       <div className={cn("flex flex-wrap", compact ? "gap-1" : "gap-2")}>
+        <Button
+          variant={variant}
+          size={size}
+          disabled={pending}
+          title="Registrar que você já falou com o cliente pelo WhatsApp"
+          onClick={() => submit(() => registerContact({ leadId }))}
+        >
+          <CheckCheck aria-hidden />
+          Já chamei
+        </Button>
         <Button
           variant={variant}
           size={size}

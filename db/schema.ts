@@ -179,6 +179,13 @@ export const conversationSummaries = pgTable("conversation_summaries", {
   customerIntent: text(),
   mainObjection: text(),
   recommendedNextAction: text(),
+  /**
+   * When to come back to the customer, counted from the seller's next reply.
+   * Set by the conversation analysis ("vou falar com meu esposo" -> 2 or 3 days);
+   * null means there is no contextual plan and the regular cadence applies.
+   */
+  followupInDays: integer(),
+  followupReason: text(),
   updatedAt: updatedAt(),
 });
 

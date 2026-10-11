@@ -90,7 +90,7 @@ describe("sending a message to a lead", () => {
     expect(updated.status).toBe("CONTACTED");
 
     const events = await db.select().from(leadEvents).where(eq(leadEvents.leadId, lead.id));
-    expect(events).toMatchObject([{ type: "MESSAGE_SENT", userId: sellerId }]);
+    expect(events).toContainEqual(expect.objectContaining({ type: "MESSAGE_SENT", userId: sellerId }));
   });
 
   it("keeps the status of a lead that is already past the first contact", async () => {

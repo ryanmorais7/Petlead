@@ -9,6 +9,7 @@ import { followups, leadEvents, leads, sales, type Lead } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth/session";
 import { OPEN_FOLLOWUP_STATUSES } from "@/lib/domain/enums";
 import { AppError, toUserMessage } from "@/lib/errors";
+import { registerManualContact } from "@/lib/followups/manual-contact";
 import { isActiveLead, isContactBlocked } from "@/lib/leads/contact-policy";
 import { logger } from "@/lib/logger";
 import { snoozeFollowupRequestSchema, updateLeadStatusRequestSchema } from "@/lib/validations/api";
@@ -81,6 +82,14 @@ export async function snoozeLead(input: { leadId: string; days: number }): Promi
         description: days === 1 ? "Contato adiado para amanhã." : `Contato adiado em ${days} dias.`,
       }),
     ]);
+  });
+}
+
+/** The seller already talked to the customer outside the system. */
+export async function registerContact(input: { leadId: string }): Promise<ActionResult> {
+  return run("registerContact", async () => {
+    const user = await getCurrentUser();
+    await registerManualContact(getDb(), { userId: user.id, leadId: leadIdSchema.parse(input.leadId) });
   });
 }
 

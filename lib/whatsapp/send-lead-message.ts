@@ -4,6 +4,7 @@ import { z } from "zod";
 import { aiSuggestions, leadEvents, leads, messages } from "@/db/schema";
 import type { DbClient } from "@/db/types";
 import { AppError } from "@/lib/errors";
+import { onOutboundMessage } from "@/lib/followups/engine";
 
 import { getConversationWindow } from "./conversation-window";
 import { getOrCreateConversation } from "./inbound";
@@ -121,6 +122,8 @@ export async function sendLeadMessage(
     description: text,
     createdAt: now,
   });
+
+  await onOutboundMessage(db, { lead, userId, lastInboundAt: lastInbound?.timestamp ?? null, now });
 
   return { messageId: pending.id };
 }

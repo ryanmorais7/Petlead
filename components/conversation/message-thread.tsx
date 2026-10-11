@@ -12,6 +12,7 @@ import {
 
 import type { Message } from "@/db/schema";
 import type { MessageStatus, MessageType } from "@/lib/domain/enums";
+import { MANUAL_CONTACT_NOTE } from "@/lib/followups/constants";
 import { dayKey, formatThreadDay, formatTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -48,6 +49,17 @@ function DeliveryIcon({ status }: { status: MessageStatus }) {
 }
 
 function MessageBubble({ message }: { message: Message }) {
+  // A contact registered by hand is a note about the conversation, not a message.
+  if (message.text === MANUAL_CONTACT_NOTE) {
+    return (
+      <li className="flex justify-center">
+        <p className="rounded-lg bg-amber-50 px-3 py-1.5 text-center text-xs text-amber-900 ring-1 ring-amber-200 ring-inset">
+          {message.text} · {formatTime(message.timestamp)}
+        </p>
+      </li>
+    );
+  }
+
   const outbound = message.direction === "OUTBOUND";
   const AttachmentIcon = message.type === "TEXT" ? null : ATTACHMENT_ICONS[message.type];
 

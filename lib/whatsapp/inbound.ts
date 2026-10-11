@@ -3,6 +3,7 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { conversations, leadEvents, leads, messages, type Lead } from "@/db/schema";
 import type { DbClient } from "@/db/types";
 import type { MessageType } from "@/lib/domain/enums";
+import { onInboundMessage } from "@/lib/followups/engine";
 import { formatPhone } from "@/lib/format";
 import type { WebhookMessage } from "@/lib/validations/whatsapp";
 
@@ -131,6 +132,9 @@ export async function saveInboundMessage(
 
   // Already stored by an earlier delivery of the same webhook.
   if (!saved) return "duplicate";
+
+  // The customer answered: pending follow-ups no longer apply.
+  await onInboundMessage(db, lead.id);
 
   const receivedAt = sql`${timestamp.toISOString()}::timestamptz`;
   await db

@@ -591,6 +591,8 @@ export function buildDemoDataset(now: Date, ownerUserId: string): Dataset {
       customerIntent: seed.summary.intent,
       mainObjection: seed.objection ?? null,
       recommendedNextAction: seed.summary.next,
+      followupInDays: null,
+      followupReason: null,
       updatedAt: lastMessage?.timestamp ?? createdAt,
     });
 
