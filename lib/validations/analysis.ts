@@ -19,9 +19,13 @@ export const conversationAnalysisSchema = z.object({
   recommendedAction: z.string().trim().min(1).max(400),
   /** Set when the customer asked not to be contacted again. */
   doNotContact: z.boolean().default(false),
-  /** Days until the next follow-up. Null when no follow-up should be created. */
+  /** Days to wait after the seller's next reply. Null when the regular cadence should apply. */
   followupInDays: z.number().int().min(0).max(120).nullable().default(null),
+  /** How sure the analysis is about the recommended message, from 0 to 1. */
+  confidence: z.number().min(0).max(1).default(0.5),
   suggestions: z.object({
+    /** The message the seller should see first. */
+    recommended: suggestionText,
     friendly: suggestionText,
     short: suggestionText,
     direct: suggestionText,

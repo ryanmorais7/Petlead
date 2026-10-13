@@ -6,6 +6,7 @@ export const ERROR_CODES = [
   "UNAUTHORIZED",
   "CONTACT_BLOCKED",
   "WHATSAPP_NOT_CONFIGURED",
+  "AI_NOT_CONFIGURED",
   "WINDOW_CLOSED",
   "WINDOW_UNKNOWN",
   "INTEGRATION",
@@ -19,6 +20,7 @@ const USER_MESSAGES: Record<ErrorCode, string> = {
   UNAUTHORIZED: "Você precisa entrar na sua conta para continuar.",
   CONTACT_BLOCKED: "Este cliente pediu para não ser contatado.",
   WHATSAPP_NOT_CONFIGURED: "WhatsApp ainda não conectado.",
+  AI_NOT_CONFIGURED: "O gerador de mensagens ainda não está conectado.",
   WINDOW_CLOSED:
     "Fora da janela de 24h. Só é possível enviar mensagem livre até 24 horas depois da última mensagem do cliente.",
   WINDOW_UNKNOWN:
@@ -33,6 +35,7 @@ const HTTP_STATUS: Record<ErrorCode, number> = {
   UNAUTHORIZED: 401,
   CONTACT_BLOCKED: 409,
   WHATSAPP_NOT_CONFIGURED: 503,
+  AI_NOT_CONFIGURED: 503,
   WINDOW_CLOSED: 409,
   WINDOW_UNKNOWN: 409,
   INTEGRATION: 502,
