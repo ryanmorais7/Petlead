@@ -19,8 +19,13 @@ O acesso exige login com e-mail e senha.
 
 A integração com a WhatsApp Business Platform (webhook, envio, janela de 24 horas) está
 implementada e testada, aguardando apenas o número real e as credenciais: veja
-[docs/whatsapp-setup.md](docs/whatsapp-setup.md). A geração de mensagens ainda não foi
-conectada.
+[docs/whatsapp-setup.md](docs/whatsapp-setup.md).
+
+O gerador de mensagens (resumo, diagnóstico e sugestões) e o motor de follow-up também
+estão implementados; o gerador precisa de uma chave de API: veja
+[docs/ai-setup.md](docs/ai-setup.md).
+
+Telas adicionais: **Leads esquecidos** (`/esquecidos`) e **Métricas** (`/metricas`).
 
 ## Stack
 
