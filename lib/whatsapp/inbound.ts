@@ -9,7 +9,7 @@ import type { WebhookMessage } from "@/lib/validations/whatsapp";
 
 import { normalizePhone, phoneVariants } from "./phone";
 
-export type InboundResult = "saved" | "duplicate";
+export type InboundResult = { outcome: "saved" | "duplicate"; leadId: string };
 
 const TYPE_MAP: Record<string, MessageType> = {
   text: "TEXT",
@@ -131,7 +131,7 @@ export async function saveInboundMessage(
     .returning({ id: messages.id });
 
   // Already stored by an earlier delivery of the same webhook.
-  if (!saved) return "duplicate";
+  if (!saved) return { outcome: "duplicate", leadId: lead.id };
 
   // The customer answered: pending follow-ups no longer apply.
   await onInboundMessage(db, lead.id);
@@ -161,5 +161,5 @@ export async function saveInboundMessage(
     { leadId: lead.id, type: "MESSAGE_RECEIVED" as const, description: text, createdAt: timestamp },
   ]);
 
-  return "saved";
+  return { outcome: "saved", leadId: lead.id };
 }

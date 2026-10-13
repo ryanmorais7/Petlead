@@ -1,12 +1,12 @@
 import { MessageCircle, MessagesSquare, PenLine, Sparkles } from "lucide-react";
 import Link from "next/link";
 
+import { GenerateSuggestionButton } from "@/components/leads/generate-suggestion-button";
 import { LeadActions } from "@/components/leads/lead-actions";
 import { StatusBadge, TemperatureBadge } from "@/components/leads/lead-badges";
 import { Avatar } from "@/components/ui/avatar";
 import { buttonStyles } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { PendingAction } from "@/components/ui/pending-action";
 import { ScoreMeter } from "@/components/ui/score-meter";
 import type { LeadOverview } from "@/lib/data/source";
 import { formatPets, formatPhone, formatRelativeDay, whatsappLink } from "@/lib/format";
@@ -83,10 +83,7 @@ export function QueueCard({ item, now, recommendation }: QueueCardProps) {
             Revisar e enviar
           </Link>
         ) : (
-          <PendingAction requires="o gerador de mensagens" variant="primary" size="sm">
-            <Sparkles aria-hidden />
-            Gerar mensagem
-          </PendingAction>
+          <GenerateSuggestionButton leadId={lead.id} />
         )}
         <Link href={conversationHref} className={buttonStyles({ size: "sm" })}>
           <MessagesSquare aria-hidden />

@@ -26,6 +26,8 @@ export type WebhookDeps = {
   phoneNumberId: string | null;
   /** Seller who receives leads created by incoming messages. */
   resolveOwnerUserId: () => Promise<string | null>;
+  /** Called once for each lead that received a new message in this delivery. */
+  onNewMessages?: (leadIds: string[]) => void;
 };
 
 export type WebhookResponse = { status: number; body: Record<string, unknown> };
@@ -35,6 +37,8 @@ export type ProcessingSummary = {
   duplicates: number;
   statusesApplied: number;
   ignored: number;
+  /** Leads that received at least one new (not duplicated) message. */
+  leadsWithNewMessages: string[];
 };
 
 /** GET handshake performed by Meta when the webhook URL is registered. */
@@ -55,7 +59,13 @@ export async function processWebhookPayload(
   payload: WebhookPayload,
   context: { ownerUserId: string; phoneNumberId: string | null },
 ): Promise<ProcessingSummary> {
-  const summary: ProcessingSummary = { messagesSaved: 0, duplicates: 0, statusesApplied: 0, ignored: 0 };
+  const summary: ProcessingSummary = {
+    messagesSaved: 0,
+    duplicates: 0,
+    statusesApplied: 0,
+    ignored: 0,
+    leadsWithNewMessages: [],
+  };
 
   for (const entry of payload.entry) {
     for (const change of entry.changes) {
@@ -81,8 +91,14 @@ export async function processWebhookPayload(
           message,
           profileName: names.get(message.from) ?? null,
         });
-        if (result === "saved") summary.messagesSaved += 1;
-        else summary.duplicates += 1;
+        if (result.outcome === "saved") {
+          summary.messagesSaved += 1;
+          if (!summary.leadsWithNewMessages.includes(result.leadId)) {
+            summary.leadsWithNewMessages.push(result.leadId);
+          }
+        } else {
+          summary.duplicates += 1;
+        }
       }
 
       for (const status of value.statuses ?? []) {
@@ -153,6 +169,7 @@ export async function handleWebhookPost(
     const nothingDone = summary.messagesSaved + summary.duplicates + summary.statusesApplied === 0;
     await finish(nothingDone ? "IGNORED" : "PROCESSED");
     logger.info("WhatsApp webhook processed", { eventId: event.id, ...summary });
+    if (summary.leadsWithNewMessages.length > 0) deps.onNewMessages?.(summary.leadsWithNewMessages);
     return { status: 200, body: { received: true } };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";

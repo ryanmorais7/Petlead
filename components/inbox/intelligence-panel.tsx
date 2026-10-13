@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 
 import { TemperatureBadge } from "@/components/leads/lead-badges";
 import { Badge } from "@/components/ui/badge";
-import { PendingAction } from "@/components/ui/pending-action";
+import { GenerateSuggestionButton } from "@/components/leads/generate-suggestion-button";
 import { ScoreMeter } from "@/components/ui/score-meter";
 import type { InboxThread } from "@/lib/data/inbox";
 import { SUGGESTION_TYPE_LABELS } from "@/lib/domain/labels";
@@ -91,10 +91,7 @@ export function IntelligencePanel({ thread, sendBlockedReason }: IntelligencePan
         ) : (
           <div className="rounded-lg border border-dashed border-zinc-200 p-4 text-center">
             <p className="text-sm text-zinc-500">Nenhuma mensagem pendente para este cliente.</p>
-            <PendingAction requires="o gerador de mensagens" size="sm" className="mt-3">
-              <Sparkles aria-hidden />
-              Gerar mensagem
-            </PendingAction>
+            <GenerateSuggestionButton leadId={lead.id} className="mt-3 block" />
           </div>
         )}
       </section>

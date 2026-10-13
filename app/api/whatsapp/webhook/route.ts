@@ -1,8 +1,10 @@
 import { asc } from "drizzle-orm";
-import type { NextRequest } from "next/server";
+import { after, type NextRequest } from "next/server";
 
 import { getDb } from "@/db";
 import { users } from "@/db/schema";
+import { analyzeLeadConversation } from "@/lib/ai/analyze-conversation";
+import { getSuggestionProvider } from "@/lib/ai/config";
 import { logger } from "@/lib/logger";
 import { getWhatsAppWebhookConfig } from "@/lib/whatsapp/config";
 import { handleWebhookPost, verifySubscription } from "@/lib/whatsapp/webhook";
@@ -38,6 +40,24 @@ async function resolveOwnerUserId(): Promise<string | null> {
   return owner?.id ?? null;
 }
 
+/**
+ * Refreshes the summary, the diagnosis and the suggested reply of each lead
+ * that just wrote. A failure here never affects the stored messages: the
+ * seller can still ask for a suggestion by hand.
+ */
+async function analyzeNewMessages(leadIds: string[]): Promise<void> {
+  const provider = getSuggestionProvider();
+  if (!provider) return;
+
+  for (const leadId of leadIds) {
+    try {
+      await analyzeLeadConversation(getDb(), { leadId }, { provider });
+    } catch (error) {
+      logger.error("Conversation analysis failed after a new message", { leadId, error });
+    }
+  }
+}
+
 export async function POST(request: NextRequest) {
   // The signature covers the exact bytes sent, so read the body as text first.
   const rawBody = await request.text();
@@ -47,7 +67,14 @@ export async function POST(request: NextRequest) {
     const { status, body } = await handleWebhookPost(
       rawBody,
       request.headers.get("x-hub-signature-256"),
-      { db: getDb(), appSecret, phoneNumberId, resolveOwnerUserId },
+      {
+        db: getDb(),
+        appSecret,
+        phoneNumberId,
+        resolveOwnerUserId,
+        // Meta expects a fast answer, so the analysis runs after the response is sent.
+        onNewMessages: (leadIds) => after(() => analyzeNewMessages(leadIds)),
+      },
     );
     return Response.json(body, { status });
   } catch (error) {

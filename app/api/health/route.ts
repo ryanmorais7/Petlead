@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import { connection } from "next/server";
 
 import { getDb } from "@/db";
+import { isAiConfigured } from "@/lib/ai/config";
 import { readAuthSecret } from "@/lib/auth/token";
 import { logger } from "@/lib/logger";
 import { getWhatsAppWebhookConfig, isWhatsAppConfigured } from "@/lib/whatsapp/config";
@@ -62,6 +63,7 @@ export async function GET() {
     // WhatsApp is optional: the app works without it, with sending disabled.
     const webhook = getWhatsAppWebhookConfig();
     return respond("ok", {
+      messageGenerator: isAiConfigured(),
       whatsapp: {
         sending: isWhatsAppConfigured(),
         webhookVerification: webhook.verifyToken !== null,

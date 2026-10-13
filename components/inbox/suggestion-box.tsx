@@ -1,8 +1,9 @@
 "use client";
 
-import { Check, Copy, MessageCircle, RefreshCw, RotateCcw, Send } from "lucide-react";
+import { Check, Copy, MessageCircle, RotateCcw, Send } from "lucide-react";
 import { useState, useTransition } from "react";
 
+import { GenerateSuggestionButton } from "@/components/leads/generate-suggestion-button";
 import { Button, buttonStyles } from "@/components/ui/button";
 import { sendMessage } from "@/lib/actions/messages";
 import { whatsappLink } from "@/lib/format";
@@ -120,15 +121,7 @@ export function SuggestionBox({
           <RotateCcw aria-hidden />
           Restaurar original
         </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          disabled
-          title="Disponível ao conectar o gerador de mensagens"
-        >
-          <RefreshCw aria-hidden />
-          Gerar outra
-        </Button>
+        <GenerateSuggestionButton leadId={leadId} mode="another" variant="ghost" />
       </div>
 
       <div className="mt-4 space-y-2 border-t border-zinc-100 pt-4">
